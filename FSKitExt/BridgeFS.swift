@@ -9,9 +9,9 @@ import Foundation
 import FSKit
 import os
 
-final class AppFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
-
-    private let logger = Logger(subsystem: "FSKitExp", category: "AppFS")
+final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
+    
+    private let logger = Logger(subsystem: "FSKitExt", category: "BridgeFS")
     
     func probeResource(
         resource: FSResource,
@@ -34,7 +34,7 @@ final class AppFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     ) {
         logger.debug("loadResource: \(resource, privacy: .public)")
         containerStatus = .ready
-        replyHandler(AppFSVolume(resource: resource), nil)
+        replyHandler(Volume(resource: resource), nil)
     }
     
     func unloadResource(

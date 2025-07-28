@@ -11,6 +11,6 @@ import FSKit
 @main
 struct FSKitExt : UnaryFileSystemExtension {
     var fileSystem : FSUnaryFileSystem & FSUnaryFileSystemOperations {
-        AppFS()
+        BridgeFS()
     }
 }

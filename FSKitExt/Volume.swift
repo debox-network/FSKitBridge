@@ -9,14 +9,14 @@ import Foundation
 import FSKit
 import os
 
-final class AppFSVolume: FSVolume {
+final class Volume: FSVolume {
     
-    private let logger = Logger(subsystem: "FSKitExp", category: "AppFSVolume")
-
+    private let logger = Logger(subsystem: "FSKitExt", category: "Volume")
+    
     private let resource: FSResource
     
-    private let root: AppFSItem = {
-        let item = AppFSItem(name: FSFileName(string: "/"))
+    private let root: Item = {
+        let item = Item(name: FSFileName(string: "/"))
         item.attributes.parentID = .parentOfRoot
         item.attributes.fileID = .rootDirectory
         item.attributes.uid = 0
@@ -39,7 +39,7 @@ final class AppFSVolume: FSVolume {
     }
 }
 
-extension AppFSVolume: FSVolume.PathConfOperations {
+extension Volume: FSVolume.PathConfOperations {
     
     var maximumLinkCount: Int {
         return -1
@@ -66,7 +66,7 @@ extension AppFSVolume: FSVolume.PathConfOperations {
     }
 }
 
-extension AppFSVolume: FSVolume.Operations {
+extension Volume: FSVolume.Operations {
     
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
         logger.debug("supportedVolumeCapabilities")
@@ -84,7 +84,7 @@ extension AppFSVolume: FSVolume.Operations {
     
     var volumeStatistics: FSStatFSResult {
         logger.debug("volumeStatistics")
-
+        
         let result = FSStatFSResult(fileSystemTypeName: "AppFS")
         
         result.blockSize = 1024000
@@ -124,7 +124,7 @@ extension AppFSVolume: FSVolume.Operations {
         _ desiredAttributes: FSItem.GetAttributesRequest,
         of item: FSItem
     ) async throws -> FSItem.Attributes {
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             logger.debug("getItemAttributes1: \(item.name), \(desiredAttributes)")
             return item.attributes
         } else {
@@ -138,7 +138,7 @@ extension AppFSVolume: FSVolume.Operations {
         on item: FSItem
     ) async throws -> FSItem.Attributes {
         logger.debug("setItemAttributes: \(item), \(newAttributes)")
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             mergeAttributes(item.attributes, request: newAttributes)
             return item.attributes
         } else {
@@ -152,7 +152,7 @@ extension AppFSVolume: FSVolume.Operations {
     ) async throws -> (FSItem, FSFileName) {
         logger.debug("lookupName: \(String(describing: name.string)), \(directory)")
         
-        guard let directory = directory as? AppFSItem else {
+        guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         
@@ -182,11 +182,11 @@ extension AppFSVolume: FSVolume.Operations {
     ) async throws -> (FSItem, FSFileName) {
         logger.debug("createItem: \(String(describing: name.string)) - \(newAttributes.mode)")
         
-        guard let directory = directory as? AppFSItem else {
+        guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
         
-        let item = AppFSItem(name: name)
+        let item = Item(name: name)
         mergeAttributes(item.attributes, request: newAttributes)
         item.attributes.parentID = directory.attributes.fileID
         item.attributes.type = type
@@ -220,7 +220,7 @@ extension AppFSVolume: FSVolume.Operations {
         fromDirectory directory: FSItem
     ) async throws {
         logger.debug("remove: \(name)")
-        if let item = item as? AppFSItem, let directory = directory as? AppFSItem {
+        if let item = item as? Item, let directory = directory as? Item {
             directory.removeItem(item)
         } else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
@@ -247,8 +247,8 @@ extension AppFSVolume: FSVolume.Operations {
         packer: FSDirectoryEntryPacker
     ) async throws -> FSDirectoryVerifier {
         logger.debug("enumerateDirectory: \(directory)")
-
-        guard let directory = directory as? AppFSItem else {
+        
+        guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         
@@ -267,7 +267,7 @@ extension AppFSVolume: FSVolume.Operations {
             
             logger.debug("-- V: \(v) - \(item.name)")
         }
-
+        
         return FSDirectoryVerifier(0)
     }
     
@@ -307,11 +307,11 @@ extension AppFSVolume: FSVolume.Operations {
         if request.isValid(FSItem.Attribute.fileID) {
             existing.fileID = request.fileID
         }
-
+        
         if request.isValid(FSItem.Attribute.parentID) {
             existing.parentID = request.parentID
         }
-
+        
         if request.isValid(FSItem.Attribute.accessTime) {
             let timespec = timespec()
             request.accessTime = timespec
@@ -350,10 +350,10 @@ extension AppFSVolume: FSVolume.Operations {
     }
 }
 
-extension AppFSVolume: FSVolume.OpenCloseOperations {
+extension Volume: FSVolume.OpenCloseOperations {
     
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             logger.debug("open: \(item.name)")
         } else {
             logger.debug("open: \(item)")
@@ -361,7 +361,7 @@ extension AppFSVolume: FSVolume.OpenCloseOperations {
     }
     
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             logger.debug("close: \(item.name)")
         } else {
             logger.debug("close: \(item)")
@@ -369,12 +369,12 @@ extension AppFSVolume: FSVolume.OpenCloseOperations {
     }
 }
 
-extension AppFSVolume: FSVolume.XattrOperations {
-
+extension Volume: FSVolume.XattrOperations {
+    
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         logger.debug("xattr: \(item) - \(name.string ?? "NA")")
         
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             return item.xattrs[name] ?? Data()
         } else {
             return Data()
@@ -384,7 +384,7 @@ extension AppFSVolume: FSVolume.XattrOperations {
     func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
         logger.debug("setXattrOf: \(item)")
         
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             item.xattrs[name] = value
         }
     }
@@ -392,7 +392,7 @@ extension AppFSVolume: FSVolume.XattrOperations {
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
         logger.debug("listXattrs: \(item)")
         
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             return Array(item.xattrs.keys)
         } else {
             return []
@@ -400,14 +400,14 @@ extension AppFSVolume: FSVolume.XattrOperations {
     }
 }
 
-extension AppFSVolume: FSVolume.ReadWriteOperations {
-
+extension Volume: FSVolume.ReadWriteOperations {
+    
     func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
         logger.debug("read: \(item)")
         
         var bytesRead = 0
         
-        if let item = item as? AppFSItem, let data = item.data {
+        if let item = item as? Item, let data = item.data {
             bytesRead = data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
                 let length = min(buffer.length, data.count)
                 _ = buffer.withUnsafeMutableBytes { dst in
@@ -423,7 +423,7 @@ extension AppFSVolume: FSVolume.ReadWriteOperations {
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
         logger.debug("write: \(item) - \(offset)")
         
-        if let item = item as? AppFSItem {
+        if let item = item as? Item {
             logger.debug("- write: \(item.name)")
             item.data = contents
             item.attributes.size = UInt64(contents.count)
