@@ -1,10 +1,3 @@
-//
-//  AppFSItem.swift
-//  FSKitExp
-//
-//  Created by Debox on 7/16/25.
-//
-
 import Foundation
 import FSKit
 
@@ -55,7 +48,3 @@ final class Item: FSItem {
         children[item.name] = nil
     }
 }
-
-// log stream --info --debug --style syslog --predicate 'subsystem == "com.example.FSKitExt"'
-// umount /tmp/vol
-// mount -F -t MyFS disk20 /tmp/vol

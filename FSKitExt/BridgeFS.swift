@@ -1,10 +1,3 @@
-//
-//  FSKitExtFileSystem.swift
-//  FSKitExt
-//
-//  Created by Debox on 7/16/25.
-//
-
 import Foundation
 import FSKit
 import os

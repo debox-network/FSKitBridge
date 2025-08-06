@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+// Define the first Request message type
+message RequestTypeOne {
+    string message = 1;    // A simple string message
+    int32 count = 2;       // A numeric field
+}
+
+// Define the second Request message type
+message RequestTypeTwo {
+    string username = 1;   // A username field
+    string password = 2;   // A password field
+}
+
+// Define the Request message that includes specific request data
+message Request {
+    oneof request_data {
+        RequestTypeOne type_one = 1;   // Data for RequestTypeOne
+        RequestTypeTwo type_two = 2;   // Data for RequestTypeTwo
+    }
+}
+
+// Define the first Response message type
+message ResponseTypeOne {
+    string reply = 1;      // A simple reply string
+    bool success = 2;      // Success flag
+}
+
+// Define the second Response message type
+message ResponseTypeTwo {
+    string status = 1;     // Status message
+    int32 errorCode = 2;   // Error code if any
+}
+
+// Define the Response message that can contain different types of responses
+message Response {
+    oneof response_data {
+        ResponseTypeOne type_one = 1;  // Response for RequestTypeOne
+        ResponseTypeTwo type_two = 2;  // Response for RequestTypeTwo
+    }
+}

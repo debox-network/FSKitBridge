@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		766207F02E3AC50D00C75C6C /* NIO in Frameworks */ = {isa = PBXBuildFile; productRef = 766207EF2E3AC50D00C75C6C /* NIO */; };
+		766207F92E3AD91200C75C6C /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 766207F82E3AD91200C75C6C /* SwiftProtobuf */; };
 		76A2B12F2E2857B200BCA3F9 /* FSKitExt.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 76A2B1252E2857B200BCA3F9 /* FSKitExt.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -82,16 +84,26 @@
 		76A2B1222E2857B200BCA3F9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				766207F02E3AC50D00C75C6C /* NIO in Frameworks */,
+				766207F92E3AD91200C75C6C /* SwiftProtobuf in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		766207EE2E3AC50D00C75C6C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		76A2B1022E28555D00BCA3F9 = {
 			isa = PBXGroup;
 			children = (
 				76A2B10D2E28555D00BCA3F9 /* FSKitBridge */,
 				76A2B1262E2857B200BCA3F9 /* FSKitExt */,
+				766207EE2E3AC50D00C75C6C /* Frameworks */,
 				76A2B10C2E28555D00BCA3F9 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -144,6 +156,10 @@
 				76A2B1262E2857B200BCA3F9 /* FSKitExt */,
 			);
 			name = FSKitExt;
+			packageProductDependencies = (
+				766207EF2E3AC50D00C75C6C /* NIO */,
+				766207F82E3AD91200C75C6C /* SwiftProtobuf */,
+			);
 			productName = FSKitExt;
 			productReference = 76A2B1252E2857B200BCA3F9 /* FSKitExt.appex */;
 			productType = "com.apple.product-type.extensionkit-extension";
@@ -175,6 +191,10 @@
 			);
 			mainGroup = 76A2B1022E28555D00BCA3F9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				766207ED2E3AC43C00C75C6C /* XCRemoteSwiftPackageReference "swift-nio" */,
+				766207F72E3AD8E300C75C6C /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 76A2B10C2E28555D00BCA3F9 /* Products */;
 			projectDirPath = "";
@@ -483,6 +503,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		766207ED2E3AC43C00C75C6C /* XCRemoteSwiftPackageReference "swift-nio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.85.0;
+			};
+		};
+		766207F72E3AD8E300C75C6C /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.30.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		766207EF2E3AC50D00C75C6C /* NIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 766207ED2E3AC43C00C75C6C /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIO;
+		};
+		766207F82E3AD91200C75C6C /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 766207F72E3AD8E300C75C6C /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 76A2B1032E28555D00BCA3F9 /* Project object */;
 }

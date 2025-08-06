@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  FSKitBridge
-//
-//  Created by Debox on 7/16/25.
-//
-
 import SwiftUI
 
 struct ContentView: View {
