@@ -16,6 +16,8 @@
 			<key>shortOptions</key>
 			<string>nqy</string>
 		</dict>
+		<key>FSFileSystemType</key>
+		<string>BridgeFS</string>
 		<key>FSFormatOptionSyntax</key>
 		<dict>
 			<key>shortOptions</key>

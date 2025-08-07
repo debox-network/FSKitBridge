@@ -6,6 +6,8 @@ final class Volume: FSVolume {
     
     private let logger = Logger(subsystem: "FSKitExt", category: "Volume")
     
+    private let socket = Socket.shared
+
     private let resource: FSResource
     
     private let root: Item = {
@@ -24,7 +26,7 @@ final class Volume: FSVolume {
     
     init(resource: FSResource) {
         self.resource = resource
-        
+
         super.init(
             volumeID: FSVolume.Identifier(uuid: Constants.volumeIdentifier),
             volumeName: FSFileName(string: "Test1")
@@ -63,6 +65,27 @@ extension Volume: FSVolume.Operations {
     
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
         logger.debug("supportedVolumeCapabilities")
+
+//        DispatchQueue.global().async { [self] in
+            do {
+                let response = try socket.sendAndWaitForResponse(message: "Ping", count: 42)
+                
+                switch response.responseData {
+                case .typeOne(let r1):
+                    logger.debug("✅ Got ResponseTypeOne: \(r1.reply, privacy: .public)")
+                case .typeTwo(let r2):
+                    logger.debug("✅ Got ResponseTypeTwo: \(r2.status, privacy: .public)")
+                case nil:
+                    logger.debug("⚠️ Response empty")
+                }
+                
+            } catch ClientTimeoutError.responseTimedOut {
+                logger.debug("❌ Request timed out")
+            } catch {
+                logger.debug("❌ Request failed: \(error)")
+            }
+//        }
+        
         
         let capabilities = FSVolume.SupportedCapabilities()
         capabilities.supportsHardLinks = true
