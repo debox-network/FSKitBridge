@@ -13,7 +13,7 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
         logger.debug("probeResource: \(resource, privacy: .public)")
         replyHandler(
             FSProbeResult.usable(
-                name: "Test1",
+                name: "Debox",
                 containerID: FSContainerIdentifier(uuid: Constants.containerIdentifier)
             ),
             nil

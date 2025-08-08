@@ -1,39 +1,139 @@
 syntax = "proto3";
 
 message Request {
-  uint64 request_id = 1;
+  uint64 id = 1;
 
-  oneof request_data {
-    RequestTypeOne type_one = 2;
+  oneof content {
+    Capabilities capabilities = 2;
     RequestTypeTwo type_two = 3;
+  }
+
+  message Capabilities {}
+
+  message RequestTypeTwo {
+    string username = 1;
+    string password = 2;
   }
 }
 
 message Response {
   uint64 request_id = 1;
 
-  oneof response_data {
-    ResponseTypeOne type_one = 2;
+  oneof content {
+    Capabilities capabilities = 2;
     ResponseTypeTwo type_two = 3;
   }
-}
 
-message RequestTypeOne {
-  string message = 1;
-  int32 count = 2;
-}
+  message Capabilities {
+    // A Boolean property that indicates whether the volume supports persistent object identifiers and can
+    // look up file system objects by their IDs.
+    optional bool supports_persistent_object_ids = 1;
 
-message RequestTypeTwo {
-  string username = 1;
-  string password = 2;
-}
+    // A Boolean property that indicates whether the volume supports symbolic links.
+    optional bool supports_symbolic_links = 2;
 
-message ResponseTypeOne {
-  string reply = 1;
-  bool success = 2;
-}
+    // A Boolean property that indicates whether the volume supports hard links.
+    optional bool supports_hard_links = 3;
 
-message ResponseTypeTwo {
-  string status = 1;
-  int32 errorCode = 2;
+    // A Boolean property that indicates whether the volume supports a journal used to speed recovery
+    // in case of unplanned restart, such as a power outage or crash.
+    //
+    // This property doesn't necessarily mean the volume is actively using a journal.
+    optional bool supports_journal = 4;
+
+    // A Boolean property that indicates whether the volume currently uses a journal for speeding recovery
+    // after an unplanned shutdown.
+    optional bool supports_active_journal = 5;
+
+    // A Boolean property that indicates the volume doesn't store reliable times for the root directory.
+    //
+    // If this value is `true` (Swift) or `YES` (Objective-C), the volume doesn't store reliable times
+    // for the root directory.
+    optional bool does_not_support_root_times = 6;
+
+    // A Boolean property that indicates whether the volume supports sparse files.
+    //
+    // A sparse file is a file that can have "holes" that the file system has never written to,
+    // and as a result don't consume space on disk.
+    optional bool supports_sparse_files = 7;
+
+    // A Boolean property that indicates whether the volume supports zero runs
+    //
+    // If this value is true, the volume keeps track of allocated but unwritten runs of a file
+    // so that it can substitute zeroes without actually writing zeroes to the media.
+    optional bool supports_zero_runs = 8;
+
+    // A Boolean property that indicates whether the volume supports fast results when fetching file system statistics.
+    //
+    // A true value means this volume hints to upper layers to indicate that `statfs(2)` is fast enough
+    // that its results need not be cached by the caller.
+    optional bool supports_fast_statfs = 9;
+
+    // A Boolean property that indicates whether the volume supports file sizes larger than 4GB,
+    // and potentially up to 2TB.
+    optional bool supports_2tb_files = 10;
+
+    // A Boolean property that indicates whether the volume supports open deny modes.
+    //
+    // These are modes such as "open for read write, deny write".
+    optional bool supports_open_deny_modes = 11;
+
+    // A Boolean property that indicates whether the volume supports hidden files.
+    //
+    // A `true` value means the volume supports the `UF_HIDDEN` file flag.
+    optional bool supports_hidden_files = 12;
+
+    // A Boolean property that indicates the volume doesn't support certain volume size reports.
+    //
+    // A true value means the volume doesn't support determining values for total data blocks, available blocks,
+    // or free blocks, as in `f_blocks`, `f_bavail`, and `f_bfree` in the struct `statFS` returned by `statfs(2)`.
+    optional bool does_not_support_volume_sizes = 13;
+
+    // A Boolean property that indicates whether the volume supports 64-bit object IDs.
+    optional bool supports_64bit_object_ids = 14;
+
+    // A Boolean property that indicates whether the volume supports document IDs for document revisions.
+    //
+    // A document ID is an identifier that persists across object ID changes.
+    optional bool supports_document_id = 15;
+
+    // A Boolean property that indicates the volume doesn't support immutable files.
+    //
+    // A `true` value means this volume doesn't support setting the `UF_IMMUTABLE` flag.
+    optional bool does_not_support_immutable_files = 16;
+
+    // A Boolean property that indicates the volume doesn't set file permissions.
+    //
+    // If this value is `true` (Swift) or `YES` (Objective-C), the volume doesn't support setting file permissions.
+    optional bool does_not_support_setting_file_permissions = 17;
+
+    // A Boolean property that indicates whether the volume supports multiple logical file systems
+    // that share space in a single "partition."
+    optional bool supports_shared_space = 18;
+
+    // A Boolean property that indicates whether the volume supports volume groups.
+    //
+    // Volume groups involve multiple logical file systems that the system can mount and unmount together,
+    // and for which the system can present common file system identifier information.
+    optional bool supports_volume_groups = 19;
+
+    // A value that indicates the volume's support for case sensitivity.
+    optional CaseFormat case_format = 20;
+
+    enum CaseFormat {
+      // The volume is case sensitive.
+      SENSITIVE = 0;
+
+      // The volume isn't case sensitive.
+      INSENSITIVE = 1;
+
+      // The volume isn't case sensitive, but supports preserving the case of file and directory names.
+      INSENSITIVE_CASE_PRESERVING = 2;
+    }
+  }
+
+  message ResponseTypeTwo {
+    string status = 1;
+    int32 errorCode = 2;
+  }
 }
