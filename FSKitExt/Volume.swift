@@ -11,17 +11,17 @@ final class Volume: FSVolume {
     private let resource: FSResource
     
     private let root: Item = {
-        let item = Item(name: FSFileName(string: "/"))
-        item.attributes.parentID = .parentOfRoot
-        item.attributes.fileID = .rootDirectory
-        item.attributes.uid = 0
-        item.attributes.gid = 0
-        item.attributes.linkCount = 1
-        item.attributes.type = .directory
-        item.attributes.mode = UInt32(S_IFDIR | 0b111_000_000)
-        item.attributes.allocSize = 1
-        item.attributes.size = 1
-        return item
+        let attrs = FSItem.Attributes()
+        attrs.parentID = .parentOfRoot
+        attrs.fileID = .rootDirectory
+        attrs.uid = 0
+        attrs.gid = 0
+        attrs.linkCount = 1
+        attrs.type = .directory
+        attrs.mode = UInt32(S_IFDIR | 0b111_000_000)
+        attrs.allocSize = 1
+        attrs.size = 1
+        return Item(name: FSFileName(string: "/"), attributes: attrs)
     }()
     
     init(resource: FSResource) {
@@ -64,84 +64,15 @@ extension Volume: FSVolume.PathConfOperations {
 extension Volume: FSVolume.Operations {
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
         logger.debug("supportedVolumeCapabilities")
-        let capabilities = FSVolume.SupportedCapabilities()
         do {
-            let content = try socket.send(content: .capabilities(Request.Capabilities()))
-            if case let .capabilities(cap) = content {
-                if cap.hasSupportsPersistentObjectIds {
-                    capabilities.supportsPersistentObjectIDs = cap.supportsPersistentObjectIds
-                }
-                if cap.hasSupportsSymbolicLinks {
-                    capabilities.supportsSymbolicLinks = cap.supportsSymbolicLinks
-                }
-                if cap.hasSupportsHardLinks {
-                    capabilities.supportsHardLinks = cap.supportsHardLinks
-                }
-                if cap.hasSupportsJournal {
-                    capabilities.supportsJournal = cap.supportsJournal
-                }
-                if cap.hasSupportsActiveJournal {
-                    capabilities.supportsActiveJournal = cap.supportsActiveJournal
-                }
-                if cap.hasDoesNotSupportRootTimes {
-                    capabilities.doesNotSupportRootTimes = cap.doesNotSupportRootTimes
-                }
-                if cap.hasSupportsSparseFiles {
-                    capabilities.supportsSparseFiles = cap.supportsSparseFiles
-                }
-                if cap.hasSupportsZeroRuns {
-                    capabilities.supportsZeroRuns = cap.supportsZeroRuns
-                }
-                if cap.hasSupportsFastStatfs {
-                    capabilities.supportsFastStatFS = cap.supportsFastStatfs
-                }
-                if cap.hasSupports2TbFiles {
-                    capabilities.supports2TBFiles = cap.supports2TbFiles
-                }
-                if cap.hasSupportsOpenDenyModes {
-                    capabilities.supportsOpenDenyModes = cap.supportsOpenDenyModes
-                }
-                if cap.hasSupportsHiddenFiles {
-                    capabilities.supportsHiddenFiles = cap.supportsHiddenFiles
-                }
-                if cap.hasDoesNotSupportVolumeSizes {
-                    capabilities.doesNotSupportVolumeSizes = cap.doesNotSupportVolumeSizes
-                }
-                if cap.hasSupports64BitObjectIds {
-                    capabilities.supports64BitObjectIDs = cap.supports64BitObjectIds
-                }
-                if cap.hasSupportsDocumentID {
-                    capabilities.supportsDocumentID = cap.supportsDocumentID
-                }
-                if cap.hasDoesNotSupportImmutableFiles {
-                    capabilities.doesNotSupportImmutableFiles = cap.doesNotSupportImmutableFiles
-                }
-                if cap.hasDoesNotSupportSettingFilePermissions {
-                    capabilities.doesNotSupportSettingFilePermissions = cap.doesNotSupportSettingFilePermissions
-                }
-                if cap.hasSupportsSharedSpace {
-                    capabilities.supportsSharedSpace = cap.supportsSharedSpace
-                }
-                if cap.hasSupportsVolumeGroups {
-                    capabilities.supportsVolumeGroups = cap.supportsVolumeGroups
-                }
-                if cap.hasCaseFormat {
-                    capabilities.caseFormat = switch cap.caseFormat {
-                    case .sensitive:
-                            .sensitive
-                    case .insensitive:
-                            .insensitive
-                    case .insensitiveCasePreserving:
-                            .insensitiveCasePreserving
-                    default:
-                            .insensitive
-                    }
-                }
+            let response = try socket.send(content: .setVolCaps(Request.SetVolCaps()))
+            if case let .volumeCapabilities(capabilities) = response {
+                return FSVolume.SupportedCapabilities(capabilities)
             }
         } catch {
             logger.error("Request failed: \(error)")
         }
-        return capabilities
+        return FSVolume.SupportedCapabilities()
     }
     
     var volumeStatistics: FSStatFSResult {
@@ -212,15 +143,24 @@ extension Volume: FSVolume.Operations {
         named name: FSFileName,
         inDirectory directory: FSItem
     ) async throws -> (FSItem, FSFileName) {
-        logger.debug("lookupName: \(String(describing: name.string)), \(directory)")
+        logger.debug("lookupName: \(name.string ?? "-", privacy: .public)")
         
         guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         
-        if let item = directory.children[name] {
+        var request = Request.Lookup()
+        request.parent = directory.id
+        request.name = name.data
+        
+        let response = try socket.send(content: .lookup(request))
+        switch response {
+        case .itemAttributes(let attrs):
+            let item = Item(name: name, attributes: FSItem.Attributes(attrs))
             return (item, name)
-        } else {
+        case .posixError(let error):
+            throw fs_errorForPOSIXError(error.code)
+        default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
@@ -248,11 +188,11 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
         
-        let item = Item(name: name)
-        mergeAttributes(item.attributes, request: newAttributes)
-        item.attributes.parentID = directory.attributes.fileID
-        item.attributes.type = type
-        directory.addItem(item)
+        let item = Item(name: name, attributes: newAttributes)
+        //        mergeAttributes(item.attributes, request: newAttributes)
+        //        item.attributes.parentID = directory.attributes.fileID
+        //        item.attributes.type = type
+        //        directory.addItem(item)
         
         return (item, name)
     }
@@ -409,6 +349,32 @@ extension Volume: FSVolume.Operations {
             request.backupTime = timespec
             existing.backupTime = timespec
         }
+    }
+}
+
+extension FSVolume.SupportedCapabilities {
+    convenience init(_ capabilities: Response.VolumeCapabilities) {
+        self.init()
+        self.supportsPersistentObjectIDs = capabilities.supportsPersistentObjectIds
+        self.supportsSymbolicLinks = capabilities.supportsSymbolicLinks
+        self.supportsHardLinks = capabilities.supportsHardLinks
+        self.supportsJournal = capabilities.supportsJournal
+        self.supportsActiveJournal = capabilities.supportsActiveJournal
+        self.doesNotSupportRootTimes = capabilities.doesNotSupportRootTimes
+        self.supportsSparseFiles = capabilities.supportsSparseFiles
+        self.supportsZeroRuns = capabilities.supportsZeroRuns
+        self.supportsFastStatFS = capabilities.supportsFastStatfs
+        self.supports2TBFiles = capabilities.supports2TbFiles
+        self.supportsOpenDenyModes = capabilities.supportsOpenDenyModes
+        self.supportsHiddenFiles = capabilities.supportsHiddenFiles
+        self.doesNotSupportVolumeSizes = capabilities.doesNotSupportVolumeSizes
+        self.supports64BitObjectIDs = capabilities.supports64BitObjectIds
+        self.supportsDocumentID = capabilities.supportsDocumentID
+        self.doesNotSupportImmutableFiles = capabilities.doesNotSupportImmutableFiles
+        self.doesNotSupportSettingFilePermissions = capabilities.doesNotSupportSettingFilePermissions
+        self.supportsSharedSpace = capabilities.supportsSharedSpace
+        self.supportsVolumeGroups = capabilities.supportsVolumeGroups
+        self.caseFormat = FSVolume.CaseFormat(rawValue: capabilities.caseFormat.rawValue)!
     }
 }
 
