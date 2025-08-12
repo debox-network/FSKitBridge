@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+message Request {
+  uint64 id = 1;
+  oneof content {
+    GetVolumeCapabilities get_volume_capabilities = 2;
+    GetAttributes get_attributes = 3;
+    LookupItem lookup_item = 4;
+  }
+}
+
+message Response {
+  uint64 request_id = 1;
+  oneof content {
+    VolumeCapabilities volume_capabilities = 2;
+    ItemAttributes item_attributes = 3;
+    PosixError posix_error = 4;
+  }
+}
+
+// A property that provides the supported capabilities of the volume.
+message GetVolumeCapabilities {}
+
+// Fetches attributes for the given item.
+message GetAttributes {
+  uint64 file_id = 1;
+}
+
+// Looks up an item within a directory.
+message LookupItem {
+  uint64 parent_id = 1;
+  bytes name = 2;
+}
+
+// A type that represents capabilities supported by a volume, such as hard and symbolic links, journaling,
+// and large file sizes.
+message VolumeCapabilities {
+  // A Boolean property that indicates whether the volume supports persistent object identifiers and can
+  // look up file system objects by their IDs.
+  optional bool supports_persistent_object_ids = 1;
+
+  // A Boolean property that indicates whether the volume supports symbolic links.
+  optional bool supports_symbolic_links = 2;
+
+  // A Boolean property that indicates whether the volume supports hard links.
+  optional bool supports_hard_links = 3;
+
+  // A Boolean property that indicates whether the volume supports a journal used to speed recovery
+  // in case of unplanned restart, such as a power outage or crash.
+  // This property doesn't necessarily mean the volume is actively using a journal.
+  optional bool supports_journal = 4;
+
+  // A Boolean property that indicates whether the volume currently uses a journal for speeding recovery
+  // after an unplanned shutdown.
+  optional bool supports_active_journal = 5;
+
+  // A Boolean property that indicates the volume doesn't store reliable times for the root directory.
+  // If this value is `true` (Swift) or `YES` (Objective-C), the volume doesn't store reliable times
+  // for the root directory.
+  optional bool does_not_support_root_times = 6;
+
+  // A Boolean property that indicates whether the volume supports sparse files.
+  // A sparse file is a file that can have "holes" that the file system has never written to,
+  // and as a result don't consume space on disk.
+  optional bool supports_sparse_files = 7;
+
+  // A Boolean property that indicates whether the volume supports zero runs
+  // If this value is true, the volume keeps track of allocated but unwritten runs of a file
+  // so that it can substitute zeroes without actually writing zeroes to the media.
+  optional bool supports_zero_runs = 8;
+
+  // A Boolean property that indicates whether the volume supports fast results when fetching file system statistics.
+  // A true value means this volume hints to upper layers to indicate that `statfs(2)` is fast enough
+  // that its results need not be cached by the caller.
+  optional bool supports_fast_statfs = 9;
+
+  // A Boolean property that indicates whether the volume supports file sizes larger than 4GB,
+  // and potentially up to 2TB.
+  optional bool supports_2tb_files = 10;
+
+  // A Boolean property that indicates whether the volume supports open deny modes.
+  // These are modes such as "open for read write, deny write".
+  optional bool supports_open_deny_modes = 11;
+
+  // A Boolean property that indicates whether the volume supports hidden files.
+  // A `true` value means the volume supports the `UF_HIDDEN` file flag.
+  optional bool supports_hidden_files = 12;
+
+  // A Boolean property that indicates the volume doesn't support certain volume size reports.
+  // A true value means the volume doesn't support determining values for total data blocks, available blocks,
+  // or free blocks, as in `f_blocks`, `f_bavail`, and `f_bfree` in the struct `statFS` returned by `statfs(2)`.
+  optional bool does_not_support_volume_sizes = 13;
+
+  // A Boolean property that indicates whether the volume supports 64-bit object IDs.
+  optional bool supports_64bit_object_ids = 14;
+
+  // A Boolean property that indicates whether the volume supports document IDs for document revisions.
+  // A document ID is an identifier that persists across object ID changes.
+  optional bool supports_document_id = 15;
+
+  // A Boolean property that indicates the volume doesn't support immutable files.
+  // A `true` value means this volume doesn't support setting the `UF_IMMUTABLE` flag.
+  optional bool does_not_support_immutable_files = 16;
+
+  // A Boolean property that indicates the volume doesn't set file permissions.
+  // If this value is `true` (Swift) or `YES` (Objective-C), the volume doesn't support setting file permissions.
+  optional bool does_not_support_setting_file_permissions = 17;
+
+  // A Boolean property that indicates whether the volume supports multiple logical file systems
+  // that share space in a single "partition."
+  optional bool supports_shared_space = 18;
+
+  // A Boolean property that indicates whether the volume supports volume groups.
+  // Volume groups involve multiple logical file systems that the system can mount and unmount together,
+  // and for which the system can present common file system identifier information.
+  optional bool supports_volume_groups = 19;
+
+  // A value that indicates the volume's support for case sensitivity.
+  optional VolumeCaseFormat case_format = 20;
+}
+
+// An enumeration of case-sensitivity support types.
+enum VolumeCaseFormat {
+  // The volume is case sensitive.
+  SENSITIVE = 0;
+
+  // The volume isn't case sensitive.
+  INSENSITIVE = 1;
+
+  // The volume isn't case sensitive, but supports preserving the case of file and directory names.
+  INSENSITIVE_CASE_PRESERVING = 2;
+}
+
+// Attributes of an item, such as size, creation and modification times, and user and group identifiers.
+message ItemAttributes {
+  // The user identifier.
+  optional uint32 uid = 1;
+
+  // The group identifier.
+  optional uint32 gid = 2;
+
+  // The mode of the item.
+  // The mode is often used for `setuid`, `setgid`, and `sticky` bits.
+  optional uint32 mode = 3;
+
+  // The item type, such as a regular file, directory, or symbolic link.
+  optional ItemType type = 4;
+
+  // The number of hard links to the item.
+  optional uint32 link_count = 5;
+
+  // The item's behavior flags.
+  // See `st_flags` in `stat.h` for flag definitions.
+  optional uint32 flags = 6;
+
+  // The item's size.
+  optional uint64 size = 7;
+
+  // The item's allocated size.
+  optional uint64 alloc_size = 8;
+
+  // The item's file identifier.
+  // Reserved values: invalid = 0, parentOfRoot = 1, and rootDirectory = 2.
+  optional uint64 file_id = 9;
+
+  // The identifier of the item's parent.
+  // Reserved values: invalid = 0, parentOfRoot = 1, and rootDirectory = 2.
+  optional uint64 parent_id = 10;
+
+  // A Boolean value that indicates whether the item supports a limited set of extended attributes.
+  optional bool supports_limited_xattrs = 11;
+
+  // A Boolean value that indicates whether the file system overrides the per-volume settings
+  // for kernel offloaded I/O for a specific file.
+  // This property has no meaning if the volume doesn't conform to ``FSVolumeKernelOffloadedIOOperations``.
+  optional bool inhibit_kernel_offloaded_io = 12;
+
+  // The item's last-modified time.
+  // This property represents `mtime`, the last time the item's contents changed.
+  optional google.protobuf.Timestamp modify_time = 13;
+
+  // The item's added time.
+  // This property represents the time the file system added the item to its parent directory.
+  optional google.protobuf.Timestamp added_time = 14;
+
+  // The item's last-changed time.
+  // This property represents `ctime`, the last time the item's metadata changed.
+  optional google.protobuf.Timestamp change_time = 15;
+
+  // The item's last-accessed time.
+  optional google.protobuf.Timestamp access_time = 16;
+
+  // The item's creation time.
+  optional google.protobuf.Timestamp birth_time = 17;
+
+  // The item's last-backup time.
+  optional google.protobuf.Timestamp backup_time = 18;
+}
+
+// An enumeration of item types, such as file, directory, or symbolic link.
+enum ItemType {
+  UNKNOWN = 0;
+  FILE = 1;
+  DIRECTORY = 2;
+  SYMLINK = 3;
+  FIFO = 4;
+  CHAR_DEVICE = 5;
+  BLOCK_DEVICE = 6;
+  SOCKET = 7;
+}
+
+// POSIX/BSD errors
+message PosixError {
+  int32 code = 1;
+}

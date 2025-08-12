@@ -63,9 +63,9 @@ extension Volume: FSVolume.PathConfOperations {
 
 extension Volume: FSVolume.Operations {
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
-        logger.debug("supportedVolumeCapabilities")
+        logger.debug("GetVolumeCapabilities")
         do {
-            let response = try socket.send(content: .setVolCaps(Request.SetVolCaps()))
+            let response = try socket.send(content: .getVolumeCapabilities(GetVolumeCapabilities()))
             if case let .volumeCapabilities(capabilities) = response {
                 return FSVolume.SupportedCapabilities(capabilities)
             }
@@ -117,12 +117,22 @@ extension Volume: FSVolume.Operations {
         _ desiredAttributes: FSItem.GetAttributesRequest,
         of item: FSItem
     ) async throws -> FSItem.Attributes {
-        if let item = item as? Item {
-            logger.debug("getItemAttributes1: \(item.name), \(desiredAttributes)")
-            return item.attributes
-        } else {
-            logger.debug("getItemAttributes2: \(item), \(desiredAttributes)")
+        guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+        }
+        logger.debug("GetAttributes: name=\(item.name.string ?? "", privacy: .public) (id=\(item.id))")
+        
+        var request = GetAttributes()
+        request.fileID = item.id
+        
+        let response = try socket.send(content: .getAttributes(request))
+        switch response {
+        case .itemAttributes(let attrs):
+            return FSItem.Attributes(attrs)
+        case .posixError(let error):
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
     
@@ -132,7 +142,7 @@ extension Volume: FSVolume.Operations {
     ) async throws -> FSItem.Attributes {
         logger.debug("setItemAttributes: \(item), \(newAttributes)")
         if let item = item as? Item {
-            mergeAttributes(item.attributes, request: newAttributes)
+          //  mergeAttributes(item.attributes, request: newAttributes)
             return item.attributes
         } else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
@@ -143,17 +153,16 @@ extension Volume: FSVolume.Operations {
         named name: FSFileName,
         inDirectory directory: FSItem
     ) async throws -> (FSItem, FSFileName) {
-        logger.debug("lookupName: \(name.string ?? "-", privacy: .public)")
-        
-        guard let directory = directory as? Item else {
+        guard let parent = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
+        logger.debug("LookupItem: parent=\(parent.name.string ?? "", privacy: .public) (id=\(parent.id)), name=\(name.string ?? "", privacy: .public)")
         
-        var request = Request.Lookup()
-        request.parent = directory.id
+        var request = LookupItem()
+        request.parentID = parent.id
         request.name = name.data
         
-        let response = try socket.send(content: .lookup(request))
+        let response = try socket.send(content: .lookupItem(request))
         switch response {
         case .itemAttributes(let attrs):
             let item = Item(name: name, attributes: FSItem.Attributes(attrs))
@@ -272,109 +281,71 @@ extension Volume: FSVolume.Operations {
         
         return FSDirectoryVerifier(0)
     }
-    
-    private func mergeAttributes(_ existing: FSItem.Attributes, request: FSItem.SetAttributesRequest) {
-        if request.isValid(FSItem.Attribute.uid) {
-            existing.uid = request.uid
-        }
-        
-        if request.isValid(FSItem.Attribute.gid) {
-            existing.gid = request.gid
-        }
-        
-        if request.isValid(FSItem.Attribute.type) {
-            existing.type = request.type
-        }
-        
-        if request.isValid(FSItem.Attribute.mode) {
-            existing.mode = request.mode
-        }
-        
-        if request.isValid(FSItem.Attribute.linkCount) {
-            existing.linkCount = request.linkCount
-        }
-        
-        if request.isValid(FSItem.Attribute.flags) {
-            existing.flags = request.flags
-        }
-        
-        if request.isValid(FSItem.Attribute.size) {
-            existing.size = request.size
-        }
-        
-        if request.isValid(FSItem.Attribute.allocSize) {
-            existing.allocSize = request.allocSize
-        }
-        
-        if request.isValid(FSItem.Attribute.fileID) {
-            existing.fileID = request.fileID
-        }
-        
-        if request.isValid(FSItem.Attribute.parentID) {
-            existing.parentID = request.parentID
-        }
-        
-        if request.isValid(FSItem.Attribute.accessTime) {
-            let timespec = timespec()
-            request.accessTime = timespec
-            existing.accessTime = timespec
-        }
-        
-        if request.isValid(FSItem.Attribute.changeTime) {
-            let timespec = timespec()
-            request.changeTime = timespec
-            existing.changeTime = timespec
-        }
-        
-        if request.isValid(FSItem.Attribute.modifyTime) {
-            let timespec = timespec()
-            request.modifyTime = timespec
-            existing.modifyTime = timespec
-        }
-        
-        if request.isValid(FSItem.Attribute.addedTime) {
-            let timespec = timespec()
-            request.addedTime = timespec
-            existing.addedTime = timespec
-        }
-        
-        if request.isValid(FSItem.Attribute.birthTime) {
-            let timespec = timespec()
-            request.birthTime = timespec
-            existing.birthTime = timespec
-        }
-        
-        if request.isValid(FSItem.Attribute.backupTime) {
-            let timespec = timespec()
-            request.backupTime = timespec
-            existing.backupTime = timespec
-        }
-    }
 }
 
 extension FSVolume.SupportedCapabilities {
-    convenience init(_ capabilities: Response.VolumeCapabilities) {
+    convenience init(_ capabilities: VolumeCapabilities) {
         self.init()
-        self.supportsPersistentObjectIDs = capabilities.supportsPersistentObjectIds
-        self.supportsSymbolicLinks = capabilities.supportsSymbolicLinks
-        self.supportsHardLinks = capabilities.supportsHardLinks
-        self.supportsJournal = capabilities.supportsJournal
-        self.supportsActiveJournal = capabilities.supportsActiveJournal
-        self.doesNotSupportRootTimes = capabilities.doesNotSupportRootTimes
-        self.supportsSparseFiles = capabilities.supportsSparseFiles
-        self.supportsZeroRuns = capabilities.supportsZeroRuns
-        self.supportsFastStatFS = capabilities.supportsFastStatfs
-        self.supports2TBFiles = capabilities.supports2TbFiles
-        self.supportsOpenDenyModes = capabilities.supportsOpenDenyModes
-        self.supportsHiddenFiles = capabilities.supportsHiddenFiles
-        self.doesNotSupportVolumeSizes = capabilities.doesNotSupportVolumeSizes
-        self.supports64BitObjectIDs = capabilities.supports64BitObjectIds
-        self.supportsDocumentID = capabilities.supportsDocumentID
-        self.doesNotSupportImmutableFiles = capabilities.doesNotSupportImmutableFiles
-        self.doesNotSupportSettingFilePermissions = capabilities.doesNotSupportSettingFilePermissions
-        self.supportsSharedSpace = capabilities.supportsSharedSpace
-        self.supportsVolumeGroups = capabilities.supportsVolumeGroups
-        self.caseFormat = FSVolume.CaseFormat(rawValue: capabilities.caseFormat.rawValue)!
+        if capabilities.hasSupportsPersistentObjectIds {
+            self.supportsPersistentObjectIDs = capabilities.supportsPersistentObjectIds
+        }
+        if capabilities.hasSupportsSymbolicLinks {
+            self.supportsSymbolicLinks = capabilities.supportsSymbolicLinks
+        }
+        if capabilities.hasSupportsHardLinks {
+            self.supportsHardLinks = capabilities.supportsHardLinks
+        }
+        if capabilities.hasSupportsJournal {
+            self.supportsJournal = capabilities.supportsJournal
+        }
+        if capabilities.hasSupportsActiveJournal {
+            self.supportsActiveJournal = capabilities.supportsActiveJournal
+        }
+        if capabilities.hasDoesNotSupportRootTimes {
+            self.doesNotSupportRootTimes = capabilities.doesNotSupportRootTimes
+        }
+        if capabilities.hasSupportsSparseFiles {
+            self.supportsSparseFiles = capabilities.supportsSparseFiles
+        }
+        if capabilities.hasSupportsZeroRuns {
+            self.supportsZeroRuns = capabilities.supportsZeroRuns
+        }
+        if capabilities.hasSupportsFastStatfs {
+            self.supportsFastStatFS = capabilities.supportsFastStatfs
+        }
+        if capabilities.hasSupports2TbFiles {
+            self.supports2TBFiles = capabilities.supports2TbFiles
+        }
+        if capabilities.hasSupportsOpenDenyModes {
+            self.supportsOpenDenyModes = capabilities.supportsOpenDenyModes
+        }
+        if capabilities.hasSupportsHiddenFiles {
+            self.supportsHiddenFiles = capabilities.supportsHiddenFiles
+        }
+        if capabilities.hasDoesNotSupportVolumeSizes {
+            self.doesNotSupportVolumeSizes = capabilities.doesNotSupportVolumeSizes
+        }
+        if capabilities.hasSupports64BitObjectIds {
+            self.supports64BitObjectIDs = capabilities.supports64BitObjectIds
+        }
+        if capabilities.hasSupportsDocumentID {
+            self.supportsDocumentID = capabilities.supportsDocumentID
+        }
+        if capabilities.hasDoesNotSupportImmutableFiles {
+            self.doesNotSupportImmutableFiles = capabilities.doesNotSupportImmutableFiles
+        }
+        if capabilities.hasDoesNotSupportSettingFilePermissions {
+            self.doesNotSupportSettingFilePermissions = capabilities.doesNotSupportSettingFilePermissions
+        }
+        if capabilities.hasSupportsSharedSpace {
+            self.supportsSharedSpace = capabilities.supportsSharedSpace
+        }
+        if capabilities.hasSupportsVolumeGroups {
+            self.supportsVolumeGroups = capabilities.supportsVolumeGroups
+        }
+        if capabilities.hasCaseFormat {
+            self.caseFormat = FSVolume.CaseFormat(rawValue: capabilities.caseFormat.rawValue)!
+        }
     }
 }
 

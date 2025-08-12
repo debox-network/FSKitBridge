@@ -12,6 +12,7 @@ final class Socket: @unchecked Sendable {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
     private var pendingPromises: [UInt64: EventLoopPromise<Response.OneOf_Content>] = [:]
+    private let lock = NSLock()
     
     func connect(host: String, port: Int) throws {
         let bootstrap = ClientBootstrap(group: group)
@@ -37,7 +38,9 @@ final class Socket: @unchecked Sendable {
         let buffer = try encodeLengthDelimited(request, allocator: channel.allocator)
         
         let promise = channel.eventLoop.makePromise(of: Response.OneOf_Content.self)
+        lock.lock()
         pendingPromises[request.id] = promise
+        lock.unlock()
         
         let timeout = channel.eventLoop.scheduleTask(in: .seconds(5)) {
             promise.fail(SocketError.responseTimedOut)
@@ -50,10 +53,12 @@ final class Socket: @unchecked Sendable {
     }
     
     func fulfillPromise(for requestID: UInt64, with response: Response) {
+        lock.lock()
+        defer { lock.unlock() }
         if let promise = pendingPromises.removeValue(forKey: requestID) {
             promise.succeed(response.content!)
         } else {
-            logger.error("No matching promise for requestID: \(requestID)")
+            logger.error("No matching promise for requestID=\(requestID)")
         }
     }
     

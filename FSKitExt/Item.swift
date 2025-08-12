@@ -26,7 +26,7 @@ final class Item: FSItem {
     var id: UInt64 { attributes.fileID.rawValue }
     
     init(name: FSFileName, attributes: FSItem.Attributes) {
-        logger.debug("Item: \(name.string ?? "-", privacy: .public)")
+        logger.debug("Item: name=\(name.string ?? "", privacy: .public) (id=\(attributes.fileID.rawValue))")
         self.name = name
         self.attributes = attributes
     }
@@ -41,26 +41,62 @@ final class Item: FSItem {
 }
 
 extension FSItem.Attributes {
-    convenience init(_ attrs: Response.ItemAttributes) {
+    convenience init(_ attributes: ItemAttributes) {
         self.init()
-        self.uid = attrs.uid
-        self.gid = attrs.gid
-        self.mode = attrs.mode
-        self.type = FSItem.ItemType(rawValue: attrs.type.rawValue)!
-        self.linkCount = attrs.linkCount
-        self.flags = attrs.flags
-        self.size = attrs.size
-        self.allocSize = attrs.allocSize
-        self.fileID = FSItem.Identifier(rawValue: attrs.fileID)!
-        self.parentID = FSItem.Identifier(rawValue: attrs.parentID)!
-        self.supportsLimitedXAttrs = attrs.supportsLimitedXattrs
-        self.inhibitKernelOffloadedIO = attrs.inhibitKernelOffloadedIo
-        self.modifyTime = timespec(attrs.modifyTime)
-        self.addedTime = timespec(attrs.addedTime)
-        self.changeTime = timespec(attrs.changeTime)
-        self.accessTime = timespec(attrs.accessTime)
-        self.birthTime = timespec(attrs.birthTime)
-        self.backupTime = timespec(attrs.backupTime)
+        if attributes.hasUid {
+            self.uid = attributes.uid
+        }
+        if attributes.hasGid {
+            self.gid = attributes.gid
+        }
+        if attributes.hasMode {
+            self.mode = attributes.mode
+        }
+        if attributes.hasType {
+            self.type = FSItem.ItemType(rawValue: attributes.type.rawValue)!
+        }
+        if attributes.hasLinkCount {
+            self.linkCount = attributes.linkCount
+        }
+        if attributes.hasFlags {
+            self.flags = attributes.flags
+        }
+        if attributes.hasSize {
+            self.size = attributes.size
+        }
+        if attributes.hasAllocSize {
+            self.allocSize = attributes.allocSize
+        }
+        if attributes.hasFileID {
+            self.fileID = FSItem.Identifier(rawValue: attributes.fileID)!
+        }
+        if attributes.hasParentID {
+            self.parentID = FSItem.Identifier(rawValue: attributes.parentID)!
+        }
+        if attributes.hasSupportsLimitedXattrs {
+            self.supportsLimitedXAttrs = attributes.supportsLimitedXattrs
+        }
+        if attributes.hasInhibitKernelOffloadedIo {
+            self.inhibitKernelOffloadedIO = attributes.inhibitKernelOffloadedIo
+        }
+        if attributes.hasModifyTime {
+            self.modifyTime = timespec(attributes.modifyTime)
+        }
+        if attributes.hasAddedTime {
+            self.addedTime = timespec(attributes.addedTime)
+        }
+        if attributes.hasChangeTime {
+            self.changeTime = timespec(attributes.changeTime)
+        }
+        if attributes.hasAccessTime {
+            self.accessTime = timespec(attributes.accessTime)
+        }
+        if attributes.hasBirthTime {
+            self.birthTime = timespec(attributes.birthTime)
+        }
+        if attributes.hasBackupTime {
+            self.backupTime = timespec(attributes.backupTime)
+        }
     }
 }
 
