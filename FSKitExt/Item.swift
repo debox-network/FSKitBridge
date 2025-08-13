@@ -100,6 +100,67 @@ extension FSItem.Attributes {
     }
 }
 
+extension FSItem.SetAttributesRequest {
+    func toProto() -> ItemAttributes {
+        var attributes = ItemAttributes()
+        if self.isValid(.uid) {
+            attributes.uid = self.uid
+        }
+        if self.isValid(.gid)  {
+            attributes.gid = self.gid
+        }
+        if self.isValid(.mode) {
+            attributes.mode = self.mode
+        }
+        if self.isValid(.type) {
+            attributes.type = ItemType(rawValue: self.type.rawValue)!
+        }
+        if self.isValid(.linkCount) {
+            attributes.linkCount = self.linkCount
+        }
+        if self.isValid(.flags) {
+            attributes.flags = self.flags
+        }
+        if self.isValid(.size) {
+            attributes.size = self.size
+        }
+        if self.isValid(.allocSize) {
+            attributes.allocSize = self.allocSize
+        }
+        if self.isValid(.fileID) {
+            attributes.fileID = self.fileID.rawValue
+        }
+        if self.isValid(.parentID) {
+            attributes.parentID = self.parentID.rawValue
+        }
+        if self.isValid(.supportsLimitedXAttrs) {
+            attributes.supportsLimitedXattrs = self.supportsLimitedXAttrs
+        }
+        if self.isValid(.inhibitKernelOffloadedIO) {
+            attributes.inhibitKernelOffloadedIo = self.inhibitKernelOffloadedIO
+        }
+        if self.isValid(.modifyTime) {
+            attributes.modifyTime = self.modifyTime.toProto()
+        }
+        if self.isValid(.addedTime) {
+            attributes.addedTime = self.addedTime.toProto()
+        }
+        if self.isValid(.changeTime) {
+            attributes.changeTime = self.changeTime.toProto()
+        }
+        if self.isValid(.accessTime) {
+            attributes.accessTime = self.accessTime.toProto()
+        }
+        if self.isValid(.birthTime) {
+            attributes.birthTime = self.birthTime.toProto()
+        }
+        if self.isValid(.backupTime) {
+            attributes.backupTime = self.backupTime.toProto()
+        }
+        return attributes
+    }
+}
+
 extension timespec {
     init(_ ts: Google_Protobuf_Timestamp) {
         self.init(
@@ -108,11 +169,10 @@ extension timespec {
         )
     }
     
-    /// Convert a timespec to a protobuf timestamp
-    //    func toProto() -> Google_Protobuf_Timestamp {
-    //        var ts = Google_Protobuf_Timestamp()
-    //        ts.seconds = Int64(self.tv_sec)
-    //        ts.nanos   = Int32(self.tv_nsec)
-    //        return ts
-    //    }
+    func toProto() -> Google_Protobuf_Timestamp {
+        var ts = Google_Protobuf_Timestamp()
+        ts.seconds = Int64(self.tv_sec)
+        ts.nanos = Int32(self.tv_nsec)
+        return ts
+    }
 }

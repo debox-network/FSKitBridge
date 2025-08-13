@@ -58,7 +58,7 @@ final class Socket: @unchecked Sendable {
         if let promise = pendingPromises.removeValue(forKey: requestID) {
             promise.succeed(response.content!)
         } else {
-            logger.error("No matching promise for requestID=\(requestID)")
+            logger.error("No matching promise for requestID = \(requestID)")
         }
     }
     
@@ -168,7 +168,6 @@ final class ResponseRouter: ChannelInboundHandler {
         let rawData = Data(unwrapInboundIn(data).readableBytesView)
         do {
             let response = try Response(serializedBytes: rawData)
-            logger.info("Decoded Response: requestID=\(response.requestID)")
             socket?.fulfillPromise(for: response.requestID, with: response)
         } catch {
             logger.error("Failed to decode response: \(error.localizedDescription, privacy: .public)")
