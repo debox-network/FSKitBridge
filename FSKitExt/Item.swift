@@ -4,39 +4,17 @@ import SwiftProtobuf
 
 final class Item: FSItem {
     
-    private let logger = Logger(subsystem: "FSKitExt", category: "Item")
-    
-    private static var id: UInt64 = FSItem.Identifier.rootDirectory.rawValue + 1
-    static func getNextID() -> UInt64 {
-        let current = id
-        id += 1
-        return current
-    }
-    
     let name: FSFileName
-    private(set) var attributes: FSItem.Attributes
-    
-    //let id = Item.getNextID()
+    let attributes: FSItem.Attributes
     
     var xattrs: [FSFileName: Data] = [:]
     var data: Data?
     
-    private(set) var children: [FSFileName: Item] = [:]
-    
     var id: UInt64 { attributes.fileID.rawValue }
     
     init(name: FSFileName, attributes: FSItem.Attributes) {
-        logger.debug("Item: name=\(name.string ?? "", privacy: .public) (id=\(attributes.fileID.rawValue))")
         self.name = name
         self.attributes = attributes
-    }
-    
-    func addItem(_ item: Item) {
-        children[item.name] = item
-    }
-    
-    func removeItem(_ item: Item) {
-        children[item.name] = nil
     }
 }
 
@@ -98,9 +76,7 @@ extension FSItem.Attributes {
             self.backupTime = timespec(attributes.backupTime)
         }
     }
-}
-
-extension FSItem.SetAttributesRequest {
+    
     func toProto() -> ItemAttributes {
         var attributes = ItemAttributes()
         if self.isValid(.uid) {

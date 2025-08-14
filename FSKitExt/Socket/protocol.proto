@@ -25,6 +25,18 @@ message Request {
     ItemAttributes attributes = 4;
   }
 
+  // Request: Opens a file for access.
+  message OpenItem {
+    ItemAttributes attributes = 1;
+    repeated OpenMode modes = 2;
+  }
+
+  // Request: Closes a file from further access.
+  message CloseItem {
+    ItemAttributes attributes = 1;
+    repeated OpenMode modes = 2;
+  }
+
   // Request itself
   uint64 id = 1;
   oneof content {
@@ -32,10 +44,15 @@ message Request {
     GetAttributes get_attributes = 3;
     LookupItem lookup_item = 4;
     CreateItem create_item = 5;
+    OpenItem open_item = 6;
+    CloseItem close_item = 7;
   }
 }
 
 message Response {
+  // Successful result
+  message Success {}
+
   // Response: A property that provides the supported capabilities of the volume.
   message GetVolumeCapabilities {
     VolumeCapabilities capabilities = 1;
@@ -66,11 +83,12 @@ message Response {
   // Response itself
   uint64 request_id = 1;
   oneof content {
-    GetVolumeCapabilities get_volume_capabilities = 2;
-    GetAttributes get_attributes = 3;
-    LookupItem lookup_item = 4;
-    CreateItem create_item = 5;
-    PosixError posix_error = 6;
+    Success success = 2;
+    GetVolumeCapabilities get_volume_capabilities = 3;
+    GetAttributes get_attributes = 4;
+    LookupItem lookup_item = 5;
+    CreateItem create_item = 6;
+    PosixError posix_error = 7;
   }
 }
 
@@ -158,11 +176,11 @@ message VolumeCapabilities {
   optional bool supports_volume_groups = 19;
 
   // A value that indicates the volume's support for case sensitivity.
-  optional VolumeCaseFormat case_format = 20;
+  optional CaseFormat case_format = 20;
 }
 
 // An enumeration of case-sensitivity support types.
-enum VolumeCaseFormat {
+enum CaseFormat {
   // The volume is case sensitive.
   SENSITIVE = 0;
 
@@ -249,4 +267,11 @@ enum ItemType {
   CHAR_DEVICE = 5;
   BLOCK_DEVICE = 6;
   SOCKET = 7;
+}
+
+// An enumeration of open modes, such as read or write.
+enum OpenMode {
+  NONE = 0;
+  READ = 1;
+  WRITE = 2;
 }
