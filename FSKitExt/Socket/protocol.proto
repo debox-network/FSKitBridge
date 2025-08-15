@@ -3,21 +3,21 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 
 message Request {
-  // Request: A property that provides the supported capabilities of the volume.
+  // A property that provides the supported capabilities of the volume.
   message GetVolumeCapabilities {}
 
-  // Request: Fetches attributes for the given item.
+  // Fetches attributes for the given item.
   message GetAttributes {
-    uint64 file_id = 1;
+    uint64 item_id = 1;
   }
 
-  // Request: Looks up an item within a directory.
+  // Looks up an item within a directory.
   message LookupItem {
     bytes name = 1;
     uint64 parent_id = 2;
   }
 
-  // Request: Creates a new file or directory item.
+  // Creates a new file or directory item.
   message CreateItem {
     bytes name = 1;
     ItemType type = 2;
@@ -25,19 +25,32 @@ message Request {
     ItemAttributes attributes = 4;
   }
 
-  // Request: Opens a file for access.
+  // Opens a file for access.
   message OpenItem {
-    ItemAttributes attributes = 1;
+    uint64 item_id = 1;
     repeated OpenMode modes = 2;
   }
 
-  // Request: Closes a file from further access.
+  // Closes a file from further access.
   message CloseItem {
-    ItemAttributes attributes = 1;
+    uint64 item_id = 1;
     repeated OpenMode modes = 2;
   }
 
-  // Request itself
+  // Reads the contents of the given file item.
+  message Read {
+    uint64 item_id = 1;
+    int64 offset = 2;
+    int64 length = 3;
+  }
+
+  // Writes contents to the given file item.
+  message Write {
+    bytes contents = 1;
+    uint64 item_id = 2;
+    int64 offset = 3;
+  }
+
   uint64 id = 1;
   oneof content {
     GetVolumeCapabilities get_volume_capabilities = 2;
@@ -46,6 +59,8 @@ message Request {
     CreateItem create_item = 5;
     OpenItem open_item = 6;
     CloseItem close_item = 7;
+    Read read = 8;
+    Write write = 9;
   }
 }
 
@@ -53,25 +68,12 @@ message Response {
   // Successful result
   message Success {}
 
-  // Response: A property that provides the supported capabilities of the volume.
-  message GetVolumeCapabilities {
-    VolumeCapabilities capabilities = 1;
-  }
-
-  // Response: Fetches attributes for the given item.
-  message GetAttributes {
+  // A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
+  message Item {
+    // Attributes of an item, such as size, creation and modification times, and user and group identifiers.
     ItemAttributes attributes = 1;
-  }
 
-  // Response: Looks up an item within a directory.
-  message LookupItem {
-    ItemAttributes attributes = 1;
-    bytes name = 2;
-  }
-
-  // Response: Creates a new file or directory item.
-  message CreateItem {
-    ItemAttributes attributes = 1;
+    // The name of a file, expressed as a data buffer.
     bytes name = 2;
   }
 
@@ -80,15 +82,15 @@ message Response {
     int32 code = 1;
   }
 
-  // Response itself
   uint64 request_id = 1;
   oneof content {
     Success success = 2;
-    GetVolumeCapabilities get_volume_capabilities = 3;
-    GetAttributes get_attributes = 4;
-    LookupItem lookup_item = 5;
-    CreateItem create_item = 6;
-    PosixError posix_error = 7;
+    VolumeCapabilities volume_capabilities = 3;
+    Item item = 4;
+    ItemAttributes item_attributes = 5;
+    bytes buffer = 6;
+    int64 byte_count = 7;
+    PosixError posix_error = 8;
   }
 }
 

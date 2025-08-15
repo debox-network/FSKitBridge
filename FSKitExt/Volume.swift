@@ -63,14 +63,14 @@ extension Volume: FSVolume.PathConfOperations {
 
 extension Volume: FSVolume.Operations {
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
-        logger.debug("GetVolumeCapabilities")
+        logger.debug("getVolumeCapabilities")
         do {
             let response = try socket.send(content: .getVolumeCapabilities(Request.GetVolumeCapabilities()))
-            if case let .getVolumeCapabilities(msg) = response {
-                return FSVolume.SupportedCapabilities(msg.capabilities)
+            if case let .volumeCapabilities(capabilities) = response {
+                return FSVolume.SupportedCapabilities(capabilities)
             }
         } catch {
-            logger.error("Request failed: \(error)")
+            logger.error("getVolumeCapabilities: failure (error = \(error))")
         }
         return FSVolume.SupportedCapabilities()
     }
@@ -113,25 +113,20 @@ extension Volume: FSVolume.Operations {
         //logger.debug("synchronize")
     }
     
-    func attributes(
-        _ desiredAttributes: FSItem.GetAttributesRequest,
-        of item: FSItem
-    ) async throws -> FSItem.Attributes {
+    func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
-        logger.debug("getAttributes: name = \(item.name.string ?? "", privacy: .public) (id = \(item.id))")
+        logger.pubDebug("getAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Request.GetAttributes()
-        request.fileID = item.id
+        request.itemID = item.id
         
-        let response = try socket.send(content: .getAttributes(request))
-        switch response {
-        case .getAttributes(let msg):
-            logger.debug("getAttributes: success (id = \(msg.attributes.fileID, privacy: .public))")
-            return FSItem.Attributes(msg.attributes)
+        switch try socket.send(content: .getAttributes(request)) {
+        case .itemAttributes(let attributes):
+            return FSItem.Attributes(attributes)
         case .posixError(let error):
-            logger.debug("getAttributes: failure (error = \(error.code))")
+            logger.error("getAttributes: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -151,27 +146,22 @@ extension Volume: FSVolume.Operations {
         }
     }
     
-    func lookupItem(
-        named name: FSFileName,
-        inDirectory directory: FSItem
-    ) async throws -> (FSItem, FSFileName) {
+    func lookupItem(named name: FSFileName, inDirectory directory: FSItem) async throws -> (FSItem, FSFileName) {
         guard let parent = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        logger.debug("lookupItem: parent = \(parent.name.string ?? "", privacy: .public) (id = \(parent.id)), name = \(name.string ?? "", privacy: .public)")
+        logger.pubDebug("lookupItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
         
         var request = Request.LookupItem()
         request.name = name.data
         request.parentID = parent.id
         
-        let response = try socket.send(content: .lookupItem(request))
-        switch response {
-        case .lookupItem(let msg):
-            logger.debug("lookupItem: success (id = \(msg.attributes.fileID, privacy: .public))")
-            let item = Item(name: FSFileName(data: msg.name), attributes: FSItem.Attributes(msg.attributes))
+        switch try socket.send(content: .lookupItem(request)) {
+        case .item(let item):
+            let item = Item(name: FSFileName(data: item.name), attributes: FSItem.Attributes(item.attributes))
             return (item, item.name)
         case .posixError(let error):
-            logger.debug("lookupItem: failure (error = \(error.code))")
+            logger.error("lookupItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -189,16 +179,11 @@ extension Volume: FSVolume.Operations {
         throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
     }
     
-    func createItem(
-        named name: FSFileName,
-        type: FSItem.ItemType,
-        inDirectory directory: FSItem,
-        attributes newAttributes: FSItem.SetAttributesRequest
-    ) async throws -> (FSItem, FSFileName) {
+    func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
         guard let parent = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        logger.debug("createItem: parent = \(parent.name.string ?? "", privacy: .public) (id = \(parent.id)), name = \(name.string ?? "", privacy: .public)")
+        logger.pubDebug("createItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
         
         var request = Request.CreateItem()
         request.name = name.data
@@ -206,14 +191,12 @@ extension Volume: FSVolume.Operations {
         request.parentID = parent.id
         request.attributes = newAttributes.toProto()
         
-        let response = try socket.send(content: .createItem(request))
-        switch response {
-        case .createItem(let msg):
-            logger.debug("createItem: success (id = \(msg.attributes.fileID, privacy: .public))")
-            let item = Item(name: FSFileName(data: msg.name), attributes: FSItem.Attributes(msg.attributes))
+        switch try socket.send(content: .createItem(request)) {
+        case .item(let item):
+            let item = Item(name: FSFileName(data: item.name), attributes: FSItem.Attributes(item.attributes))
             return (item, item.name)
         case .posixError(let error):
-            logger.debug("createItem: failure (error = \(error.code))")
+            logger.error("createItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -302,18 +285,17 @@ extension Volume: FSVolume.OpenCloseOperations {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
-        logger.debug("openItem: name = \(item.name.string ?? "", privacy: .public) (id = \(item.id))")
+        logger.pubDebug("openItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Request.OpenItem()
-        request.attributes = item.attributes.toProto()
+        request.itemID = item.id
         request.modes = modes.toProto()
         
-        let response = try socket.send(content: .openItem(request))
-        switch response {
+        switch try socket.send(content: .openItem(request)) {
         case .success(_):
-            logger.debug("openItem: success (id = \(item.id, privacy: .public))")
+            break
         case .posixError(let error):
-            logger.debug("openItem: failure (error = \(error.code))")
+            logger.error("openItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -324,18 +306,69 @@ extension Volume: FSVolume.OpenCloseOperations {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
         }
-        logger.debug("closeItem: name = \(item.name.string ?? "", privacy: .public) (id = \(item.id))")
+        logger.pubDebug("closeItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Request.CloseItem()
-        request.attributes = item.attributes.toProto()
+        request.itemID = item.id
         request.modes = modes.toProto()
         
-        let response = try socket.send(content: .closeItem(request))
-        switch response {
+        switch try socket.send(content: .closeItem(request)) {
         case .success(_):
-            logger.debug("closeItem: success (id = \(item.id, privacy: .public))")
+            break
         case .posixError(let error):
-            logger.debug("closeItem: failure (error = \(error.code))")
+            logger.error("closeItem: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+}
+
+extension Volume: FSVolume.ReadWriteOperations {
+    func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+        }
+        logger.pubDebug("read: name = \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Request.Read()
+        request.itemID = item.id
+        request.offset = offset
+        request.length = Int64(length)
+        
+        switch try socket.send(content: .read(request)) {
+        case .buffer(let data):
+            return data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
+                let length = min(buffer.length, data.count)
+                _ = buffer.withUnsafeMutableBytes { dst in
+                    memcpy(dst.baseAddress, ptr.baseAddress, length)
+                }
+                return length
+            }
+        case .posixError(let error):
+            logger.error("read: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+    
+    func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+        }
+        logger.pubDebug("write: name = \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Request.Write()
+        request.contents = contents
+        request.itemID = item.id
+        request.offset = offset
+        
+        switch try socket.send(content: .write(request)) {
+        case .byteCount(let count):
+            return Int(count)
+        case .posixError(let error):
+            logger.error("write: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -344,7 +377,6 @@ extension Volume: FSVolume.OpenCloseOperations {
 }
 
 extension Volume: FSVolume.XattrOperations {
-    
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         logger.debug("xattr: \(item) - \(name.string ?? "NA")")
         
@@ -371,40 +403,6 @@ extension Volume: FSVolume.XattrOperations {
         } else {
             return []
         }
-    }
-}
-
-extension Volume: FSVolume.ReadWriteOperations {
-    
-    func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
-        logger.debug("read: \(item)")
-        
-        var bytesRead = 0
-        
-        if let item = item as? Item, let data = item.data {
-            bytesRead = data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
-                let length = min(buffer.length, data.count)
-                _ = buffer.withUnsafeMutableBytes { dst in
-                    memcpy(dst.baseAddress, ptr.baseAddress, length)
-                }
-                return length
-            }
-        }
-        
-        return bytesRead
-    }
-    
-    func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
-        logger.debug("write: \(item) - \(offset)")
-        
-        if let item = item as? Item {
-            logger.debug("- write: \(item.name)")
-            item.data = contents
-            item.attributes.size = UInt64(contents.count)
-            item.attributes.allocSize = UInt64(contents.count)
-        }
-        
-        return contents.count
     }
 }
 

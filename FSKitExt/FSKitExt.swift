@@ -29,6 +29,12 @@ struct FSKitExt : UnaryFileSystemExtension {
     }
 }
 
+extension Logger {
+    func pubDebug(_ message: String) {
+        self.debug("\(message, privacy: .public)")
+    }
+}
+
 // log stream --info --debug --style syslog --predicate 'subsystem == "FSKitExt"'
 //
 // mkfile -n 1m /tmp/fskit-rs.dmg
