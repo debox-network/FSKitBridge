@@ -11,9 +11,9 @@ final class Volume: FSVolume {
     private let resource: FSResource
     
     private let root: Item = {
-        let attrs = FSItem.Attributes()
-        attrs.parentID = .parentOfRoot
-        attrs.fileID = .rootDirectory
+        var attrs = ItemAttributes()
+        attrs.parentID = 1
+        attrs.fileID = 2
         attrs.uid = 0
         attrs.gid = 0
         attrs.linkCount = 1
@@ -21,7 +21,10 @@ final class Volume: FSVolume {
         attrs.mode = UInt32(S_IFDIR | 0b111_000_000)
         attrs.allocSize = 1
         attrs.size = 1
-        return Item(name: FSFileName(string: "/"), attributes: attrs)
+        var item = Response.Item()
+        item.attributes = attrs
+        item.name = Data("/".utf8)
+        return Item(item)
     }()
     
     init(resource: FSResource) {
@@ -115,7 +118,7 @@ extension Volume: FSVolume.Operations {
     
     func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
         guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("getAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
         
@@ -158,7 +161,7 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            let item = Item(name: FSFileName(data: item.name), attributes: FSItem.Attributes(item.attributes))
+            let item = Item(item)
             return (item, item.name)
         case .posixError(let error):
             logger.error("lookupItem: failure (error = \(error.code))")
@@ -193,7 +196,7 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .createItem(request)) {
         case .item(let item):
-            let item = Item(name: FSFileName(data: item.name), attributes: FSItem.Attributes(item.attributes))
+            let item = Item(item)
             return (item, item.name)
         case .posixError(let error):
             logger.error("createItem: failure (error = \(error.code))")
@@ -247,43 +250,45 @@ extension Volume: FSVolume.Operations {
         throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
     }
     
-    func enumerateDirectory(
-        _ directory: FSItem,
-        startingAt cookie: FSDirectoryCookie,
-        verifier: FSDirectoryVerifier,
-        attributes: FSItem.GetAttributesRequest?,
-        packer: FSDirectoryEntryPacker
-    ) async throws -> FSDirectoryVerifier {
-        logger.debug("enumerateDirectory: \(directory)")
-        
-        guard let directory = directory as? Item else {
+    func enumerateDirectory(_ directory: FSItem, startingAt cookie: FSDirectoryCookie, verifier: FSDirectoryVerifier, attributes: FSItem.GetAttributesRequest?, packer: FSDirectoryEntryPacker) async throws -> FSDirectoryVerifier {
+        guard let item = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
+        logger.pubDebug("enumerateDirectory: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        logger.debug("- enumerateDirectory - \(directory.name)")
-        /*
-         for (idx, item) in directory.children.values.enumerated() {
-         let isLast = (idx == directory.children.count - 1)
-         
-         let v = packer.packEntry(
-         name: item.name,
-         itemType: item.attributes.type,
-         itemID: item.attributes.fileID,
-         nextCookie: FSDirectoryCookie(UInt64(idx)),
-         attributes: attributes != nil ? item.attributes : nil
-         )
-         
-         logger.debug("-- V: \(v) - \(item.name)")
-         }
-         */
-        return FSDirectoryVerifier(0)
+        var request = Request.EnumerateDirectory()
+        request.itemID = item.id
+        request.cookie = cookie.rawValue
+        request.verifier = verifier.rawValue
+        
+        switch try socket.send(content: .enumerateDirectory(request)) {
+        case .directoryEntries(let entries):
+            for entry in entries.entries {
+                let item = Item(entry.item)
+                if !packer.packEntry(
+                    name: item.name,
+                    itemType: item.attributes.type,
+                    itemID: item.attributes.fileID,
+                    nextCookie: FSDirectoryCookie(entry.nextCookie),
+                    attributes: attributes != nil ? item.attributes : nil
+                ) {
+                    break
+                }
+            }
+            return FSDirectoryVerifier(entries.verifier)
+        case .posixError(let error):
+            logger.error("enumerateDirectory: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
 }
 
 extension Volume: FSVolume.OpenCloseOperations {
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("openItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
@@ -304,7 +309,7 @@ extension Volume: FSVolume.OpenCloseOperations {
     
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("closeItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
@@ -327,7 +332,7 @@ extension Volume: FSVolume.OpenCloseOperations {
 extension Volume: FSVolume.ReadWriteOperations {
     func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
         guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("read: name = \(item.name.string ?? "") (id = \(item.id))")
         
@@ -355,7 +360,7 @@ extension Volume: FSVolume.ReadWriteOperations {
     
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
         guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("write: name = \(item.name.string ?? "") (id = \(item.id))")
         

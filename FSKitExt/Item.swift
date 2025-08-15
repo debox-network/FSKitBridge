@@ -8,13 +8,12 @@ final class Item: FSItem {
     let attributes: FSItem.Attributes
     
     var xattrs: [FSFileName: Data] = [:]
-    var data: Data?
     
     var id: UInt64 { attributes.fileID.rawValue }
     
-    init(name: FSFileName, attributes: FSItem.Attributes) {
-        self.name = name
-        self.attributes = attributes
+    init(_ item: Response.Item) {
+        self.name = FSFileName(data: item.name)
+        self.attributes = FSItem.Attributes(item.attributes)
     }
 }
 

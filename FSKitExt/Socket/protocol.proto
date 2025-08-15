@@ -25,6 +25,13 @@ message Request {
     ItemAttributes attributes = 4;
   }
 
+  // Enumerates the contents of the given directory.
+  message EnumerateDirectory {
+    uint64 item_id = 1;
+    uint64 cookie = 2;
+    uint64 verifier = 3;
+  }
+
   // Opens a file for access.
   message OpenItem {
     uint64 item_id = 1;
@@ -57,10 +64,11 @@ message Request {
     GetAttributes get_attributes = 3;
     LookupItem lookup_item = 4;
     CreateItem create_item = 5;
-    OpenItem open_item = 6;
-    CloseItem close_item = 7;
-    Read read = 8;
-    Write write = 9;
+    EnumerateDirectory enumerate_directory = 6;
+    OpenItem open_item = 7;
+    CloseItem close_item = 8;
+    Read read = 9;
+    Write write = 10;
   }
 }
 
@@ -77,6 +85,24 @@ message Response {
     bytes name = 2;
   }
 
+  // An object used to provide items during a directory enumeration.
+  message DirectoryEntries {
+    // An object used to provide item during a directory enumeration.
+    message Entry {
+      // A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
+      Item item = 1;
+
+      // A value to indicate the next entry in the directory to enumerate.
+      uint64 next_cookie = 2;
+    }
+
+    // List of entries
+    repeated Entry entries = 1;
+
+    // A tool to detect whether the directory contents changed since the last call to `enumerateDirectory`.
+    uint64 verifier = 2;
+  }
+
   // POSIX/BSD errors
   message PosixError {
     int32 code = 1;
@@ -86,11 +112,12 @@ message Response {
   oneof content {
     Success success = 2;
     VolumeCapabilities volume_capabilities = 3;
-    Item item = 4;
-    ItemAttributes item_attributes = 5;
-    bytes buffer = 6;
-    int64 byte_count = 7;
-    PosixError posix_error = 8;
+    ItemAttributes item_attributes = 4;
+    Item item = 5;
+    DirectoryEntries directory_entries = 6;
+    bytes buffer = 7;
+    int64 byte_count = 8;
+    PosixError posix_error = 9;
   }
 }
 
