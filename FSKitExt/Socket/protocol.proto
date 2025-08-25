@@ -11,6 +11,12 @@ message Request {
     uint64 item_id = 1;
   }
 
+  // Sets the given attributes on an item.
+  message SetAttributes {
+    ItemAttributes attributes = 1;
+    uint64 item_id = 2;
+  }
+
   // Looks up an item within a directory.
   message LookupItem {
     bytes name = 1;
@@ -62,13 +68,14 @@ message Request {
   oneof content {
     GetVolumeCapabilities get_volume_capabilities = 2;
     GetAttributes get_attributes = 3;
-    LookupItem lookup_item = 4;
-    CreateItem create_item = 5;
-    EnumerateDirectory enumerate_directory = 6;
-    OpenItem open_item = 7;
-    CloseItem close_item = 8;
-    Read read = 9;
-    Write write = 10;
+    SetAttributes set_attributes = 4;
+    LookupItem lookup_item = 5;
+    CreateItem create_item = 6;
+    EnumerateDirectory enumerate_directory = 7;
+    OpenItem open_item = 8;
+    CloseItem close_item = 9;
+    Read read = 10;
+    Write write = 11;
   }
 }
 

@@ -136,16 +136,24 @@ extension Volume: FSVolume.Operations {
         }
     }
     
-    func setAttributes(
-        _ newAttributes: FSItem.SetAttributesRequest,
-        on item: FSItem
-    ) async throws -> FSItem.Attributes {
-        logger.debug("setItemAttributes: \(item), \(newAttributes)")
-        if let item = item as? Item {
-            //  mergeAttributes(item.attributes, request: newAttributes)
-            return item.attributes
-        } else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+    func setAttributes(_ newAttributes: FSItem.SetAttributesRequest, on item: FSItem) async throws -> FSItem.Attributes {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        logger.pubDebug("setAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Request.SetAttributes()
+        request.attributes = newAttributes.toProto()
+        request.itemID = item.id
+        
+        switch try socket.send(content: .setAttributes(request)) {
+        case .itemAttributes(let attributes):
+            return FSItem.Attributes(attributes)
+        case .posixError(let error):
+            logger.error("setAttributes: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
     
