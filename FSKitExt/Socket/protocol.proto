@@ -83,7 +83,7 @@ message Request {
 
   // Enumerates the contents of the given directory.
   message EnumerateDirectory {
-    uint64 item_id = 1;
+    uint64 directory_id = 1;
     uint64 cookie = 2;
     uint64 verifier = 3;
   }
