@@ -223,14 +223,14 @@ extension Volume: FSVolume.Operations {
     }
     
     func lookupItem(named name: FSFileName, inDirectory directory: FSItem) async throws -> (FSItem, FSFileName) {
-        guard let parent = directory as? Item else {
+        guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        logger.pubDebug("lookupItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
+        logger.pubDebug("lookupItem: directory = \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.LookupItem()
         request.name = name.data
-        request.parentID = parent.id
+        request.directoryID = directory.id
         
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
@@ -256,15 +256,15 @@ extension Volume: FSVolume.Operations {
     }
     
     func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
-        guard let parent = directory as? Item else {
+        guard let directory = directory as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        logger.pubDebug("createItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
+        logger.pubDebug("createItem: directory = \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.CreateItem()
         request.name = name.data
         request.type = Pb_ItemType(rawValue: type.rawValue)!
-        request.parentID = parent.id
+        request.directoryID = directory.id
         request.attributes = newAttributes.toProto()
         
         switch try socket.send(content: .createItem(request)) {
@@ -311,16 +311,38 @@ extension Volume: FSVolume.Operations {
         }
     }
     
-    func renameItem(
-        _ item: FSItem,
-        inDirectory sourceDirectory: FSItem,
-        named sourceName: FSFileName,
-        to destinationName: FSFileName,
-        inDirectory destinationDirectory: FSItem,
-        overItem: FSItem?
-    ) async throws -> FSFileName {
-        logger.debug("rename: \(item)")
-        throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+    func renameItem(_ item: FSItem, inDirectory sourceDirectory: FSItem, named sourceName: FSFileName, to destinationName: FSFileName, inDirectory destinationDirectory: FSItem, overItem: FSItem?) async throws -> FSFileName {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        guard let sourceDirectory = sourceDirectory as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        guard let destinationDirectory = destinationDirectory as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        let overItem = overItem as? Item
+        logger.pubDebug("renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))")
+        
+        var request = Pb_Request.RenameItem()
+        request.itemID = item.id
+        request.sourceDirectoryID = sourceDirectory.id
+        request.sourceName = item.name.data
+        request.destinationName = destinationName.data
+        request.destinationDirectoryID = destinationDirectory.id
+        if overItem != nil {
+            request.overItemID = overItem!.id
+        }
+        
+        switch try socket.send(content: .renameItem(request)) {
+        case .data(let data):
+            return FSFileName(data: data)
+        case .posixError(let error):
+            logger.error("renameItem: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func enumerateDirectory(_ directory: FSItem, startingAt cookie: FSDirectoryCookie, verifier: FSDirectoryVerifier, attributes: FSItem.GetAttributesRequest?, packer: FSDirectoryEntryPacker) async throws -> FSDirectoryVerifier {

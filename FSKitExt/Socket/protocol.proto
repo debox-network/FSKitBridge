@@ -5,7 +5,7 @@ package pb;
 import "google/protobuf/timestamp.proto";
 
 message Request {
-  /// Properties implemented by volumes that support providing the values of system limits or options.
+  // Properties implemented by volumes that support providing the values of system limits or options.
   message GetPathConfOperations {}
 
   // A property that provides the supported capabilities of the volume.
@@ -25,15 +25,60 @@ message Request {
   // Looks up an item within a directory.
   message LookupItem {
     bytes name = 1;
-    uint64 parent_id = 2;
+    uint64 directory_id = 2;
   }
 
   // Creates a new file or directory item.
   message CreateItem {
     bytes name = 1;
     ItemType type = 2;
-    uint64 parent_id = 3;
+    uint64 directory_id = 3;
     ItemAttributes attributes = 4;
+  }
+
+  // Renames an item from one path in the file system to another.
+  //
+  // Implement renaming along the lines of this algorithm:
+  //
+  // - If `item` is a file:
+  //   - If the destination file exists:
+  //     - Remove the destination file.
+  //   - If the source and destination directories are the same:
+  //     - Rewrite the name in the existing directory.
+  //   - Else:
+  //     - Write the new entry in the destination directory.
+  //     - Clear the old directory entry.
+  // - If `item` is a directory:
+  //   - If the destination directory exists:
+  //     - If the destination directory isn't empty:
+  //       - Fail the operation with an error of <doc://com.apple.documentation/documentation/Foundation/NSPOSIXErrorDomain> and a code of `ENOTEMPTY`.
+  //     - Else:
+  //        - Remove the destination directory.
+  //     - If the source and destination directories are the same:
+  //       - Rewrite the name in the existing directory.
+  //     - Else:
+  //       - If the destination is a child of the source directory:
+  //         - Fail the operation with an error.
+  //       - Else:
+  //         - Write the new entry in the destination directory.
+  //         - Update `"."` and `".."` in the moved directory.
+  //         - Clear the old directory entry.
+  //
+  // - Parameters:
+  //   - item: The file system object being renamed.
+  //   - sourceDirectory: The directory that currently contains the item to rename.
+  //   - sourceName: The name of the item within the source directory.
+  //   - destinationName: The new name of the item as it appears in `destinationDirectory`.
+  //   - destinationDirectory: The directory to contain the renamed object, which may be the same as `sourceDirectory`.
+  //   - overItem: The file system object if the destination exists, as discovered in a prior lookup. If this parameter is non-`nil`, mark `overItem` as deleted, so the file system can free its allocated space on the next call to ``reclaimItem(_:replyHandler:)``. After doing so, ensure the operation finishes without errors.
+  //   - reply: A block or closure to indicate success or failure. If renaming succeeds, pass the ``FSFileName`` as it exists within `destinationDirectory` and a `nil` error. If renaming fails, pass the relevant error as the second parameter; FSKit ignores any ``FSFileName`` in this case. For an `async` Swift implementation, there's no reply handler; simply return the ``FSFileName`` or throw an error.
+  message RenameItem {
+    uint64 item_id = 1;
+    uint64 source_directory_id = 2;
+    bytes source_name = 3;
+    bytes destination_name = 4;
+    uint64 destination_directory_id = 5;
+    optional uint64 over_item_id = 6;
   }
 
   // Enumerates the contents of the given directory.
@@ -43,7 +88,7 @@ message Request {
     uint64 verifier = 3;
   }
 
-  /// Properties implemented by volumes that natively or partially support extended attributes.
+  // Properties implemented by volumes that natively or partially support extended attributes.
   message GetXattrOperations {}
 
   // Gets the specified extended attribute of the given item.
@@ -110,15 +155,16 @@ message Request {
     SetAttributes set_attributes = 5;
     LookupItem lookup_item = 6;
     CreateItem create_item = 7;
-    EnumerateDirectory enumerate_directory = 8;
-    GetXattrOperations get_xattr_operations = 9;
-    GetXattr get_xattr = 10;
-    SetXattr set_xattr = 11;
-    GetXattrs get_xattrs = 12;
-    OpenItem open_item = 13;
-    CloseItem close_item = 14;
-    Read read = 15;
-    Write write = 16;
+    RenameItem rename_item = 8;
+    EnumerateDirectory enumerate_directory = 9;
+    GetXattrOperations get_xattr_operations = 10;
+    GetXattr get_xattr = 11;
+    SetXattr set_xattr = 12;
+    GetXattrs get_xattrs = 13;
+    OpenItem open_item = 14;
+    CloseItem close_item = 15;
+    Read read = 16;
+    Write write = 17;
   }
 }
 
@@ -180,68 +226,68 @@ message Response {
   }
 }
 
-/// Properties implemented by volumes that support providing the values of system limits or options.
-///
-/// This protocol gathers properties related to the `pathconf` and `fpathconf` system calls.
-///
-/// For a file, the value of a property applies to just that file; for a directory, the value applies to all items in the directory.
-///
-/// Properties that represent limits and have a numeric type use `-1` to represent no limit.
+// Properties implemented by volumes that support providing the values of system limits or options.
+//
+// This protocol gathers properties related to the `pathconf` and `fpathconf` system calls.
+//
+// For a file, the value of a property applies to just that file; for a directory, the value applies to all items in the directory.
+//
+// Properties that represent limits and have a numeric type use `-1` to represent no limit.
 message PathConfOperations {
 
-  /// A property that represents the maximum number of hard links to the object.
+  // A property that represents the maximum number of hard links to the object.
   int64 maximum_link_count = 1;
 
-  /// A property that represents the maximum length of a component of a filename.
+  // A property that represents the maximum length of a component of a filename.
   int64 maximum_name_length = 2;
 
-  /// A Boolean property that indicates whether the volume restricts ownership changes based on authorization.
-  ///
-  /// If this value is true, the volume rejects a `chown(2)` from anyone other than the superuser.
+  // A Boolean property that indicates whether the volume restricts ownership changes based on authorization.
+  //
+  // If this value is true, the volume rejects a `chown(2)` from anyone other than the superuser.
   bool restricts_ownership_changes = 3;
 
-  /// A property that indicates whether the volume truncates files longer than its maximum supported length.
-  ///
-  /// If this value is `true`, the volume truncates the filename to ``maximumNameLength`` if the filename is longer than that.
-  /// If this value is false, the file system responds with the error code `ENAMETOOLONG` if the filename is longer than ``maximumNameLength``.
+  // A property that indicates whether the volume truncates files longer than its maximum supported length.
+  //
+  // If this value is `true`, the volume truncates the filename to ``maximumNameLength`` if the filename is longer than that.
+  // If this value is false, the file system responds with the error code `ENAMETOOLONG` if the filename is longer than ``maximumNameLength``.
   bool truncates_long_names = 4;
 
-  /// The maximum extended attribute size in bytes.
-  ///
-  /// Implement at least one of `maximumXattrSize` or ``maximumXattrSizeInBits``.
-  /// FSKit automatically converts from one to another if needed.
-  /// If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
+  // The maximum extended attribute size in bytes.
+  //
+  // Implement at least one of `maximumXattrSize` or ``maximumXattrSizeInBits``.
+  // FSKit automatically converts from one to another if needed.
+  // If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
   optional int64 maximum_xattr_size = 5;
 
-  /// The maximum extended attribute size in bits.
-  ///
-  /// Implement at least one of ``maximumXattrSize`` or `maximumXattrSizeInBits`.
-  /// FSKit automatically converts from one to another if needed.
-  /// If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
+  // The maximum extended attribute size in bits.
+  //
+  // Implement at least one of ``maximumXattrSize`` or `maximumXattrSizeInBits`.
+  // FSKit automatically converts from one to another if needed.
+  // If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
   optional int64 maximum_xattr_size_in_bits = 6;
 
 
-  /// The maximum size of a regular file allowed in the volume.
-  ///
-  /// Implement at least one of `maximumFileSize` or ``maximumFileSizeInBits``.
-  /// FSKit automatically converts from one to another if needed.
-  /// If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
+  // The maximum size of a regular file allowed in the volume.
+  //
+  // Implement at least one of `maximumFileSize` or ``maximumFileSizeInBits``.
+  // FSKit automatically converts from one to another if needed.
+  // If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
   optional uint64 maximum_file_size = 7;
 
-  /// The minimum number of bits needed to represent, as a signed integer value, the maximum size of a regular file allowed in the volume.
-  ///
-  /// The maximum file size is `2^(maximumFileSizeInBits - 1)`.
-  ///
-  /// | Maximum file size (bytes)  | Maximum (in hex)     | Unsigned bits | Signed bits |
-  /// | -------------------------: | -------------------: | ------------: | ----------: |
-  /// |                     65,535 |             `0xFFFF` |            16 |          17 |
-  /// |              2,147,483,647 |         `0x7FFFFFFF` |            31 |          32 |
-  /// |              4,294,967,295 |         `0xFFFFFFFF` |            32 |          33 |
-  /// | 18,446,744,073,709,551,615 | `0xFFFFFFFFFFFFFFFF` |            64 |          65 |
-  ///
-  /// Implement at least one of ``maximumFileSize`` or `maximumFileSizeInBits`.
-  /// FSKit automatically converts from one to another if needed.
-  /// If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
+  // The minimum number of bits needed to represent, as a signed integer value, the maximum size of a regular file allowed in the volume.
+  //
+  // The maximum file size is `2^(maximumFileSizeInBits - 1)`.
+  //
+  // | Maximum file size (bytes)  | Maximum (in hex)     | Unsigned bits | Signed bits |
+  // | -------------------------: | -------------------: | ------------: | ----------: |
+  // |                     65,535 |             `0xFFFF` |            16 |          17 |
+  // |              2,147,483,647 |         `0x7FFFFFFF` |            31 |          32 |
+  // |              4,294,967,295 |         `0xFFFFFFFF` |            32 |          33 |
+  // | 18,446,744,073,709,551,615 | `0xFFFFFFFFFFFFFFFF` |            64 |          65 |
+  //
+  // Implement at least one of ``maximumFileSize`` or `maximumFileSizeInBits`.
+  // FSKit automatically converts from one to another if needed.
+  // If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
   optional int64 maximum_file_size_in_bits = 8;
 }
 
@@ -332,13 +378,13 @@ message VolumeCapabilities {
   optional CaseFormat case_format = 20;
 }
 
-/// Properties implemented by volumes that natively or partially support extended attributes.
+// Properties implemented by volumes that natively or partially support extended attributes.
 message XattrOperations {
 
-  /// A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
-  ///
-  /// FSKit reads this value after the file system replies to the `loadResource` message.
-  /// Changing the returned value during the runtime of the volume has no effect.
+  // A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
+  //
+  // FSKit reads this value after the file system replies to the `loadResource` message.
+  // Changing the returned value during the runtime of the volume has no effect.
   optional bool xattr_operations_inhibited = 1;
 }
 
