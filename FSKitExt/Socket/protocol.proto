@@ -38,6 +38,36 @@ message Request {
     uint64 verifier = 3;
   }
 
+  // Gets the specified extended attribute of the given item.
+  message GetXattr {
+    // The extended attribute name.
+    bytes name = 1;
+
+    // The item for which to get the extended attribute.
+    uint64 item_id = 2;
+  }
+
+  // Sets the specified extended attribute data on the given item.
+  message SetXattr {
+    // The extended attribute name.
+    bytes name = 1;
+
+    // The extended attribute value to set. This can't be `nil`, unless the policy is ``XattrPolicy/delete``.
+    optional bytes value = 2;
+
+    // The item on which to set the extended attribute.
+    uint64 item_id = 3;
+
+    // The policy to apply when setting the attribute. See ``XattrPolicy`` for possible values.
+    XattrPolicy policy = 4;
+  }
+
+  // Gets the list of extended attributes currently set on the given item.
+  message GetXattrs {
+    // The item from which to get extended attributes.
+    uint64 item_id = 1;
+  }
+
   // Opens a file for access.
   message OpenItem {
     uint64 item_id = 1;
@@ -72,10 +102,13 @@ message Request {
     LookupItem lookup_item = 5;
     CreateItem create_item = 6;
     EnumerateDirectory enumerate_directory = 7;
-    OpenItem open_item = 8;
-    CloseItem close_item = 9;
-    Read read = 10;
-    Write write = 11;
+    GetXattr get_xattr = 8;
+    SetXattr set_xattr = 9;
+    GetXattrs get_xattrs = 10;
+    OpenItem open_item = 11;
+    CloseItem close_item = 12;
+    Read read = 13;
+    Write write = 14;
   }
 }
 
@@ -103,11 +136,17 @@ message Response {
       uint64 next_cookie = 2;
     }
 
-    // List of entries
+    // List of entries.
     repeated Entry entries = 1;
 
     // A tool to detect whether the directory contents changed since the last call to `enumerateDirectory`.
     uint64 verifier = 2;
+  }
+
+  // List of extended attributes.
+  message Xattrs {
+    // The extended attribute name.
+    repeated bytes names = 1;
   }
 
   // POSIX/BSD errors
@@ -122,9 +161,10 @@ message Response {
     ItemAttributes item_attributes = 4;
     Item item = 5;
     DirectoryEntries directory_entries = 6;
-    bytes buffer = 7;
-    int64 byte_count = 8;
-    PosixError posix_error = 9;
+    Xattrs xattrs = 7;
+    bytes data = 8;
+    int64 byte_count = 9;
+    PosixError posix_error = 10;
   }
 }
 
@@ -310,4 +350,19 @@ enum OpenMode {
   NONE = 0;
   READ = 1;
   WRITE = 2;
+}
+
+// Flags to specify the policy when setting extended file attributes.
+enum XattrPolicy {
+  // Set the value, regardless of previous state.
+  ALWAYS_SET = 0;
+
+  // Set the value, but fail if the extended attribute already exists.
+  MUST_CREATE = 1;
+
+  // Set the value, but fail if the extended attribute doesn't already exist.
+  MUST_REPLACE = 2;
+
+  // Delete the value, failing if the extended attribute doesn't exist.
+  DELETE = 3;
 }

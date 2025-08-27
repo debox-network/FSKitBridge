@@ -293,6 +293,78 @@ extension Volume: FSVolume.Operations {
     }
 }
 
+extension Volume: FSVolume.XattrOperations {
+    func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        logger.pubDebug("getXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        
+        var request = Request.GetXattr()
+        request.name = name.data
+        request.itemID = item.id
+        
+        switch try socket.send(content: .getXattr(request)) {
+        case .data(let data):
+            return data
+        case .posixError(let error):
+            logger.error("getXattr: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+    
+    func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        logger.pubDebug("setXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        
+        var request = Request.SetXattr()
+        request.name = name.data
+        if value != nil {
+            request.value = value!
+        }
+        request.itemID = item.id
+        request.policy = XattrPolicy(rawValue: Int(policy.rawValue))!
+        
+        switch try socket.send(content: .setXattr(request)) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("setXattr: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+    
+    func xattrs(of item: FSItem) async throws -> [FSFileName] {
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        logger.pubDebug("getXattrs: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        
+        var request = Request.GetXattrs()
+        request.itemID = item.id
+        
+        switch try socket.send(content: .getXattrs(request)) {
+        case .xattrs(let xattrs):
+            var names: [FSFileName] = []
+            for name in xattrs.names {
+                names.append(FSFileName(data: name))
+            }
+            return names
+        case .posixError(let error):
+            logger.error("getXattr: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+}
+
 extension Volume: FSVolume.OpenCloseOperations {
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         guard let item = item as? Item else {
@@ -306,7 +378,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         
         switch try socket.send(content: .openItem(request)) {
         case .success(_):
-            break
+            return
         case .posixError(let error):
             logger.error("openItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
@@ -327,7 +399,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         
         switch try socket.send(content: .closeItem(request)) {
         case .success(_):
-            break
+            return
         case .posixError(let error):
             logger.error("closeItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
@@ -350,7 +422,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         request.length = Int64(length)
         
         switch try socket.send(content: .read(request)) {
-        case .buffer(let data):
+        case .data(let data):
             return data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
                 let length = min(buffer.length, data.count)
                 _ = buffer.withUnsafeMutableBytes { dst in
@@ -385,36 +457,6 @@ extension Volume: FSVolume.ReadWriteOperations {
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-    }
-}
-
-extension Volume: FSVolume.XattrOperations {
-    func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
-        logger.debug("xattr: \(item) - \(name.string ?? "NA")")
-        
-        if let item = item as? Item {
-            return item.xattrs[name] ?? Data()
-        } else {
-            return Data()
-        }
-    }
-    
-    func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
-        logger.debug("setXattrOf: \(item)")
-        
-        if let item = item as? Item {
-            item.xattrs[name] = value
-        }
-    }
-    
-    func xattrs(of item: FSItem) async throws -> [FSFileName] {
-        logger.debug("listXattrs: \(item)")
-        
-        if let item = item as? Item {
-            return Array(item.xattrs.keys)
-        } else {
-            return []
         }
     }
 }
