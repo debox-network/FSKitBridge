@@ -11,7 +11,7 @@ final class Socket: @unchecked Sendable {
     
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
-    private var pendingPromises: [UInt64: EventLoopPromise<Response.OneOf_Content>] = [:]
+    private var pendingPromises: [UInt64: EventLoopPromise<Pb_Response.OneOf_Content>] = [:]
     private let lock = NSLock()
     
     func connect(host: String, port: Int) throws {
@@ -26,18 +26,18 @@ final class Socket: @unchecked Sendable {
         logger.info("Connected to \(host, privacy: .public):\(port)")
     }
     
-    func send(content: Request.OneOf_Content) throws -> Response.OneOf_Content {
+    func send(content: Pb_Request.OneOf_Content) throws -> Pb_Response.OneOf_Content {
         guard let channel = self.channel else {
             throw SocketError.notConnected
         }
         
-        var request = Request()
+        var request = Pb_Request()
         request.id = generateRequestID()
         request.content = content
         
         let buffer = try encodeLengthDelimited(request, allocator: channel.allocator)
         
-        let promise = channel.eventLoop.makePromise(of: Response.OneOf_Content.self)
+        let promise = channel.eventLoop.makePromise(of: Pb_Response.OneOf_Content.self)
         lock.lock()
         pendingPromises[request.id] = promise
         lock.unlock()
@@ -52,7 +52,7 @@ final class Socket: @unchecked Sendable {
         return try promise.futureResult.wait()
     }
     
-    func fulfillPromise(for requestID: UInt64, with response: Response) {
+    func fulfillPromise(for requestID: UInt64, with response: Pb_Response) {
         lock.lock()
         defer { lock.unlock() }
         if let promise = pendingPromises.removeValue(forKey: requestID) {
@@ -167,7 +167,7 @@ final class ResponseRouter: ChannelInboundHandler {
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         let rawData = Data(unwrapInboundIn(data).readableBytesView)
         do {
-            let response = try Response(serializedBytes: rawData)
+            let response = try Pb_Response(serializedBytes: rawData)
             socket?.fulfillPromise(for: response.requestID, with: response)
         } catch {
             logger.error("Failed to decode response: \(error.localizedDescription, privacy: .public)")

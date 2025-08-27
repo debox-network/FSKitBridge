@@ -1,8 +1,13 @@
 syntax = "proto3";
 
+package pb;
+
 import "google/protobuf/timestamp.proto";
 
 message Request {
+  /// Properties implemented by volumes that support providing the values of system limits or options.
+  message GetPathConfOperations {}
+
   // A property that provides the supported capabilities of the volume.
   message GetVolumeCapabilities {}
 
@@ -38,6 +43,9 @@ message Request {
     uint64 verifier = 3;
   }
 
+  /// Properties implemented by volumes that natively or partially support extended attributes.
+  message GetXattrOperations {}
+
   // Gets the specified extended attribute of the given item.
   message GetXattr {
     // The extended attribute name.
@@ -52,14 +60,14 @@ message Request {
     // The extended attribute name.
     bytes name = 1;
 
-    // The extended attribute value to set. This can't be `nil`, unless the policy is ``XattrPolicy/delete``.
+    // The extended attribute value to set. This can't be `nil`, unless the policy is ``SetXattrPolicy/delete``.
     optional bytes value = 2;
 
     // The item on which to set the extended attribute.
     uint64 item_id = 3;
 
-    // The policy to apply when setting the attribute. See ``XattrPolicy`` for possible values.
-    XattrPolicy policy = 4;
+    // The policy to apply when setting the attribute. See ``SetXattrPolicy`` for possible values.
+    SetXattrPolicy policy = 4;
   }
 
   // Gets the list of extended attributes currently set on the given item.
@@ -96,19 +104,21 @@ message Request {
 
   uint64 id = 1;
   oneof content {
-    GetVolumeCapabilities get_volume_capabilities = 2;
-    GetAttributes get_attributes = 3;
-    SetAttributes set_attributes = 4;
-    LookupItem lookup_item = 5;
-    CreateItem create_item = 6;
-    EnumerateDirectory enumerate_directory = 7;
-    GetXattr get_xattr = 8;
-    SetXattr set_xattr = 9;
-    GetXattrs get_xattrs = 10;
-    OpenItem open_item = 11;
-    CloseItem close_item = 12;
-    Read read = 13;
-    Write write = 14;
+    GetPathConfOperations get_path_conf_operations = 2;
+    GetVolumeCapabilities get_volume_capabilities = 3;
+    GetAttributes get_attributes = 4;
+    SetAttributes set_attributes = 5;
+    LookupItem lookup_item = 6;
+    CreateItem create_item = 7;
+    EnumerateDirectory enumerate_directory = 8;
+    GetXattrOperations get_xattr_operations = 9;
+    GetXattr get_xattr = 10;
+    SetXattr set_xattr = 11;
+    GetXattrs get_xattrs = 12;
+    OpenItem open_item = 13;
+    CloseItem close_item = 14;
+    Read read = 15;
+    Write write = 16;
   }
 }
 
@@ -156,16 +166,83 @@ message Response {
 
   uint64 request_id = 1;
   oneof content {
-    Success success = 2;
+    PathConfOperations path_conf_operations = 2;
     VolumeCapabilities volume_capabilities = 3;
     ItemAttributes item_attributes = 4;
     Item item = 5;
     DirectoryEntries directory_entries = 6;
-    Xattrs xattrs = 7;
-    bytes data = 8;
-    int64 byte_count = 9;
-    PosixError posix_error = 10;
+    XattrOperations xattr_operations = 7;
+    Xattrs xattrs = 8;
+    bytes data = 9;
+    int64 byte_count = 10;
+    Success success = 11;
+    PosixError posix_error = 12;
   }
+}
+
+/// Properties implemented by volumes that support providing the values of system limits or options.
+///
+/// This protocol gathers properties related to the `pathconf` and `fpathconf` system calls.
+///
+/// For a file, the value of a property applies to just that file; for a directory, the value applies to all items in the directory.
+///
+/// Properties that represent limits and have a numeric type use `-1` to represent no limit.
+message PathConfOperations {
+
+  /// A property that represents the maximum number of hard links to the object.
+  int64 maximum_link_count = 1;
+
+  /// A property that represents the maximum length of a component of a filename.
+  int64 maximum_name_length = 2;
+
+  /// A Boolean property that indicates whether the volume restricts ownership changes based on authorization.
+  ///
+  /// If this value is true, the volume rejects a `chown(2)` from anyone other than the superuser.
+  bool restricts_ownership_changes = 3;
+
+  /// A property that indicates whether the volume truncates files longer than its maximum supported length.
+  ///
+  /// If this value is `true`, the volume truncates the filename to ``maximumNameLength`` if the filename is longer than that.
+  /// If this value is false, the file system responds with the error code `ENAMETOOLONG` if the filename is longer than ``maximumNameLength``.
+  bool truncates_long_names = 4;
+
+  /// The maximum extended attribute size in bytes.
+  ///
+  /// Implement at least one of `maximumXattrSize` or ``maximumXattrSizeInBits``.
+  /// FSKit automatically converts from one to another if needed.
+  /// If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
+  optional int64 maximum_xattr_size = 5;
+
+  /// The maximum extended attribute size in bits.
+  ///
+  /// Implement at least one of ``maximumXattrSize`` or `maximumXattrSizeInBits`.
+  /// FSKit automatically converts from one to another if needed.
+  /// If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
+  optional int64 maximum_xattr_size_in_bits = 6;
+
+
+  /// The maximum size of a regular file allowed in the volume.
+  ///
+  /// Implement at least one of `maximumFileSize` or ``maximumFileSizeInBits``.
+  /// FSKit automatically converts from one to another if needed.
+  /// If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
+  optional uint64 maximum_file_size = 7;
+
+  /// The minimum number of bits needed to represent, as a signed integer value, the maximum size of a regular file allowed in the volume.
+  ///
+  /// The maximum file size is `2^(maximumFileSizeInBits - 1)`.
+  ///
+  /// | Maximum file size (bytes)  | Maximum (in hex)     | Unsigned bits | Signed bits |
+  /// | -------------------------: | -------------------: | ------------: | ----------: |
+  /// |                     65,535 |             `0xFFFF` |            16 |          17 |
+  /// |              2,147,483,647 |         `0x7FFFFFFF` |            31 |          32 |
+  /// |              4,294,967,295 |         `0xFFFFFFFF` |            32 |          33 |
+  /// | 18,446,744,073,709,551,615 | `0xFFFFFFFFFFFFFFFF` |            64 |          65 |
+  ///
+  /// Implement at least one of ``maximumFileSize`` or `maximumFileSizeInBits`.
+  /// FSKit automatically converts from one to another if needed.
+  /// If you implement both, FSKit uses only the `maximumFileSizeInBits` implementation.
+  optional int64 maximum_file_size_in_bits = 8;
 }
 
 // A type that represents capabilities supported by a volume, such as hard and symbolic links, journaling,
@@ -255,16 +332,14 @@ message VolumeCapabilities {
   optional CaseFormat case_format = 20;
 }
 
-// An enumeration of case-sensitivity support types.
-enum CaseFormat {
-  // The volume is case sensitive.
-  SENSITIVE = 0;
+/// Properties implemented by volumes that natively or partially support extended attributes.
+message XattrOperations {
 
-  // The volume isn't case sensitive.
-  INSENSITIVE = 1;
-
-  // The volume isn't case sensitive, but supports preserving the case of file and directory names.
-  INSENSITIVE_CASE_PRESERVING = 2;
+  /// A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
+  ///
+  /// FSKit reads this value after the file system replies to the `loadResource` message.
+  /// Changing the returned value during the runtime of the volume has no effect.
+  optional bool xattr_operations_inhibited = 1;
 }
 
 // Attributes of an item, such as size, creation and modification times, and user and group identifiers.
@@ -333,6 +408,18 @@ message ItemAttributes {
   optional google.protobuf.Timestamp backup_time = 18;
 }
 
+// An enumeration of case-sensitivity support types.
+enum CaseFormat {
+  // The volume is case sensitive.
+  SENSITIVE = 0;
+
+  // The volume isn't case sensitive.
+  INSENSITIVE = 1;
+
+  // The volume isn't case sensitive, but supports preserving the case of file and directory names.
+  INSENSITIVE_CASE_PRESERVING = 2;
+}
+
 // An enumeration of item types, such as file, directory, or symbolic link.
 enum ItemType {
   UNKNOWN = 0;
@@ -345,15 +432,8 @@ enum ItemType {
   SOCKET = 7;
 }
 
-// An enumeration of open modes, such as read or write.
-enum OpenMode {
-  NONE = 0;
-  READ = 1;
-  WRITE = 2;
-}
-
 // Flags to specify the policy when setting extended file attributes.
-enum XattrPolicy {
+enum SetXattrPolicy {
   // Set the value, regardless of previous state.
   ALWAYS_SET = 0;
 
@@ -365,4 +445,11 @@ enum XattrPolicy {
 
   // Delete the value, failing if the extended attribute doesn't exist.
   DELETE = 3;
+}
+
+// An enumeration of open modes, such as read or write.
+enum OpenMode {
+  NONE = 0;
+  READ = 1;
+  WRITE = 2;
 }

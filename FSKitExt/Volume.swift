@@ -10,8 +10,12 @@ final class Volume: FSVolume {
     
     private let resource: FSResource
     
+    private var pathConfOperations: Pb_PathConfOperations!
+    private var volumeCapabilities: Pb_VolumeCapabilities!
+    private var xattrOperations: Pb_XattrOperations!
+    
     private let root: Item = {
-        var attrs = ItemAttributes()
+        var attrs = Pb_ItemAttributes()
         attrs.parentID = 1
         attrs.fileID = 2
         attrs.uid = 0
@@ -21,7 +25,7 @@ final class Volume: FSVolume {
         attrs.mode = UInt32(S_IFDIR | 0b111_000_000)
         attrs.allocSize = 1
         attrs.size = 1
-        var item = Response.Item()
+        var item = Pb_Response.Item()
         item.attributes = attrs
         item.name = Data("/".utf8)
         return Item(item)
@@ -35,47 +39,108 @@ final class Volume: FSVolume {
             volumeName: FSFileName(string: "Debox")
         )
     }
+    
+    func load() {
+        pathConfOperations = getPathConfOperations()
+        volumeCapabilities = getVolumeCapabilities()
+        xattrOperations = getXattrOperations()
+    }
+    
+    private func getPathConfOperations() -> Pb_PathConfOperations {
+        logger.debug("getPathConfOperations")
+        do {
+            let response = try socket.send(content: .getPathConfOperations(Pb_Request.GetPathConfOperations()))
+            if case let .pathConfOperations(value) = response {
+                return value
+            }
+        } catch {
+            logger.error("getPathConfOperations: failure (error = \(error))")
+        }
+        return Pb_PathConfOperations()
+    }
+    
+    private func getVolumeCapabilities() -> Pb_VolumeCapabilities {
+        logger.debug("getVolumeCapabilities")
+        do {
+            let response = try socket.send(content: .getVolumeCapabilities(Pb_Request.GetVolumeCapabilities()))
+            if case let .volumeCapabilities(value) = response {
+                return value
+            }
+        } catch {
+            logger.error("getVolumeCapabilities: failure (error = \(error))")
+        }
+        return Pb_VolumeCapabilities()
+    }
+    
+    private func getXattrOperations() -> Pb_XattrOperations {
+        logger.debug("getXattrOperations")
+        do {
+            let response = try socket.send(content: .getXattrOperations(Pb_Request.GetXattrOperations()))
+            if case let .xattrOperations(value) = response {
+                return value
+            }
+        } catch {
+            logger.error("getXattrOperations: failure (error = \(error))")
+        }
+        return Pb_XattrOperations()
+    }
 }
 
 extension Volume: FSVolume.PathConfOperations {
     
     var maximumLinkCount: Int {
-        return -1
+        Int(pathConfOperations.maximumLinkCount)
     }
     
     var maximumNameLength: Int {
-        return -1
+        Int(pathConfOperations.maximumNameLength)
     }
     
     var restrictsOwnershipChanges: Bool {
-        return false
+        pathConfOperations.restrictsOwnershipChanges
     }
     
     var truncatesLongNames: Bool {
-        return false
+        pathConfOperations.truncatesLongNames
     }
     
     var maximumXattrSize: Int {
-        return Int.max
+        if pathConfOperations.hasMaximumXattrSize {
+            Int(pathConfOperations.maximumXattrSize)
+        } else {
+            Int.max
+        }
+    }
+    
+    var maximumXattrSizeInBits: Int {
+        if pathConfOperations.hasMaximumXattrSizeInBits {
+            Int(pathConfOperations.maximumXattrSizeInBits)
+        } else {
+            Int.max
+        }
     }
     
     var maximumFileSize: UInt64 {
-        return UInt64.max
+        if pathConfOperations.hasMaximumFileSize {
+            pathConfOperations.maximumFileSize
+        } else {
+            UInt64.max
+        }
+    }
+    
+    var maximumFileSizeInBits: Int {
+        if pathConfOperations.hasMaximumFileSizeInBits {
+            Int(pathConfOperations.maximumFileSizeInBits)
+        } else {
+            Int.max
+        }
     }
 }
 
 extension Volume: FSVolume.Operations {
+    
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
-        logger.debug("getVolumeCapabilities")
-        do {
-            let response = try socket.send(content: .getVolumeCapabilities(Request.GetVolumeCapabilities()))
-            if case let .volumeCapabilities(capabilities) = response {
-                return FSVolume.SupportedCapabilities(capabilities)
-            }
-        } catch {
-            logger.error("getVolumeCapabilities: failure (error = \(error))")
-        }
-        return FSVolume.SupportedCapabilities()
+        FSVolume.SupportedCapabilities(volumeCapabilities)
     }
     
     var volumeStatistics: FSStatFSResult {
@@ -122,7 +187,7 @@ extension Volume: FSVolume.Operations {
         }
         logger.pubDebug("getAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.GetAttributes()
+        var request = Pb_Request.GetAttributes()
         request.itemID = item.id
         
         switch try socket.send(content: .getAttributes(request)) {
@@ -142,7 +207,7 @@ extension Volume: FSVolume.Operations {
         }
         logger.pubDebug("setAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.SetAttributes()
+        var request = Pb_Request.SetAttributes()
         request.attributes = newAttributes.toProto()
         request.itemID = item.id
         
@@ -163,7 +228,7 @@ extension Volume: FSVolume.Operations {
         }
         logger.pubDebug("lookupItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
         
-        var request = Request.LookupItem()
+        var request = Pb_Request.LookupItem()
         request.name = name.data
         request.parentID = parent.id
         
@@ -196,9 +261,9 @@ extension Volume: FSVolume.Operations {
         }
         logger.pubDebug("createItem: parent = \(parent.name.string ?? "") (id = \(parent.id)), name = \(name.string ?? "")")
         
-        var request = Request.CreateItem()
+        var request = Pb_Request.CreateItem()
         request.name = name.data
-        request.type = ItemType(rawValue: type.rawValue)!
+        request.type = Pb_ItemType(rawValue: type.rawValue)!
         request.parentID = parent.id
         request.attributes = newAttributes.toProto()
         
@@ -264,7 +329,7 @@ extension Volume: FSVolume.Operations {
         }
         logger.pubDebug("enumerateDirectory: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.EnumerateDirectory()
+        var request = Pb_Request.EnumerateDirectory()
         request.itemID = item.id
         request.cookie = cookie.rawValue
         request.verifier = verifier.rawValue
@@ -294,13 +359,24 @@ extension Volume: FSVolume.Operations {
 }
 
 extension Volume: FSVolume.XattrOperations {
+    var xattrOperationsInhibited: Bool {
+        get {
+            if xattrOperations.hasXattrOperationsInhibited {
+                xattrOperations.xattrOperationsInhibited
+            } else {
+                true
+            }
+        }
+        set {}
+    }
+    
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         logger.pubDebug("getXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
-        var request = Request.GetXattr()
+        var request = Pb_Request.GetXattr()
         request.name = name.data
         request.itemID = item.id
         
@@ -321,13 +397,13 @@ extension Volume: FSVolume.XattrOperations {
         }
         logger.pubDebug("setXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
-        var request = Request.SetXattr()
+        var request = Pb_Request.SetXattr()
         request.name = name.data
         if value != nil {
             request.value = value!
         }
         request.itemID = item.id
-        request.policy = XattrPolicy(rawValue: Int(policy.rawValue))!
+        request.policy = Pb_SetXattrPolicy(rawValue: Int(policy.rawValue))!
         
         switch try socket.send(content: .setXattr(request)) {
         case .success(_):
@@ -346,7 +422,7 @@ extension Volume: FSVolume.XattrOperations {
         }
         logger.pubDebug("getXattrs: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
-        var request = Request.GetXattrs()
+        var request = Pb_Request.GetXattrs()
         request.itemID = item.id
         
         switch try socket.send(content: .getXattrs(request)) {
@@ -372,7 +448,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         }
         logger.pubDebug("openItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.OpenItem()
+        var request = Pb_Request.OpenItem()
         request.itemID = item.id
         request.modes = modes.toProto()
         
@@ -393,7 +469,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         }
         logger.pubDebug("closeItem: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.CloseItem()
+        var request = Pb_Request.CloseItem()
         request.itemID = item.id
         request.modes = modes.toProto()
         
@@ -416,7 +492,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         }
         logger.pubDebug("read: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.Read()
+        var request = Pb_Request.Read()
         request.itemID = item.id
         request.offset = offset
         request.length = Int64(length)
@@ -444,7 +520,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         }
         logger.pubDebug("write: name = \(item.name.string ?? "") (id = \(item.id))")
         
-        var request = Request.Write()
+        var request = Pb_Request.Write()
         request.contents = contents
         request.itemID = item.id
         request.offset = offset
@@ -462,7 +538,7 @@ extension Volume: FSVolume.ReadWriteOperations {
 }
 
 extension FSVolume.SupportedCapabilities {
-    convenience init(_ capabilities: VolumeCapabilities) {
+    convenience init(_ capabilities: Pb_VolumeCapabilities) {
         self.init()
         if capabilities.hasSupportsPersistentObjectIds {
             self.supportsPersistentObjectIDs = capabilities.supportsPersistentObjectIds
@@ -528,10 +604,10 @@ extension FSVolume.SupportedCapabilities {
 }
 
 extension FSVolume.OpenModes {
-    func toProto() -> [OpenMode] {
-        var modes: [OpenMode] = []
-        if self.rawValue & UInt(OpenMode.read.rawValue) != 0 { modes.append(.read) }
-        if self.rawValue & UInt(OpenMode.write.rawValue) != 0 { modes.append(.write) }
+    func toProto() -> [Pb_OpenMode] {
+        var modes: [Pb_OpenMode] = []
+        if self.rawValue & UInt(Pb_OpenMode.read.rawValue) != 0 { modes.append(.read) }
+        if self.rawValue & UInt(Pb_OpenMode.write.rawValue) != 0 { modes.append(.write) }
         return modes
     }
 }

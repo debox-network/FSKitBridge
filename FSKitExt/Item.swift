@@ -7,18 +7,16 @@ final class Item: FSItem {
     let name: FSFileName
     let attributes: FSItem.Attributes
     
-    var xattrs: [FSFileName: Data] = [:]
-    
     var id: UInt64 { attributes.fileID.rawValue }
     
-    init(_ item: Response.Item) {
+    init(_ item: Pb_Response.Item) {
         self.name = FSFileName(data: item.name)
         self.attributes = FSItem.Attributes(item.attributes)
     }
 }
 
 extension FSItem.Attributes {
-    convenience init(_ attributes: ItemAttributes) {
+    convenience init(_ attributes: Pb_ItemAttributes) {
         self.init()
         if attributes.hasUid {
             self.uid = attributes.uid
@@ -76,8 +74,8 @@ extension FSItem.Attributes {
         }
     }
     
-    func toProto() -> ItemAttributes {
-        var attributes = ItemAttributes()
+    func toProto() -> Pb_ItemAttributes {
+        var attributes = Pb_ItemAttributes()
         if self.isValid(.uid) {
             attributes.uid = self.uid
         }
@@ -88,7 +86,7 @@ extension FSItem.Attributes {
             attributes.mode = self.mode
         }
         if self.isValid(.type) {
-            attributes.type = ItemType(rawValue: self.type.rawValue)!
+            attributes.type = Pb_ItemType(rawValue: self.type.rawValue)!
         }
         if self.isValid(.linkCount) {
             attributes.linkCount = self.linkCount
