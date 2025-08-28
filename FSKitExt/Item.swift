@@ -4,14 +4,22 @@ import SwiftProtobuf
 
 final class Item: FSItem {
     
-    let name: FSFileName
-    let attributes: FSItem.Attributes
+    private(set) var name: FSFileName
+    private(set) var attributes: FSItem.Attributes
     
     var id: UInt64 { attributes.fileID.rawValue }
     
     init(_ item: Pb_Response.Item) {
         self.name = FSFileName(data: item.name)
         self.attributes = FSItem.Attributes(item.attributes)
+    }
+    
+    func updateName(name: Data) {
+        self.name = FSFileName(data: name)
+    }
+    
+    func updateAttributes(attributes: Pb_ItemAttributes) {
+        self.attributes = FSItem.Attributes(attributes)
     }
 }
 

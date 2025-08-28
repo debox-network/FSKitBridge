@@ -182,7 +182,9 @@ extension Volume: FSVolume.Operations {
     }
     
     func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
-        let item = item as! Item
+        guard let item = item as? Item else {
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
         logger.pubDebug("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.GetAttributes()
@@ -190,7 +192,8 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .getAttributes(request)) {
         case .itemAttributes(let attributes):
-            return FSItem.Attributes(attributes)
+            item.updateAttributes(attributes: attributes)
+            return item.attributes
         case .posixError(let error):
             logger.error("getAttributes: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
@@ -330,7 +333,8 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .renameItem(request)) {
         case .data(let data):
-            return FSFileName(data: data)
+            item.updateName(name: data)
+            return item.name
         case .posixError(let error):
             logger.error("renameItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
