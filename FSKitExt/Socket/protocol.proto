@@ -36,6 +36,22 @@ message Request {
     ItemAttributes attributes = 4;
   }
 
+  // Removes an existing item from a given directory.
+  //
+  // Don't actually remove the item object itself in your implementation; instead, only remove the given item name from the given directory.
+  // Remove and deallocate the item in ``reclaimItem(_:replyHandler:)``.
+  //
+  // - Parameters:
+  //   - item: The item to remove.
+  //   - name: The name of the item to remove.
+  //   - directory: The directory from which to remove the item.
+  //   - reply: A block or closure to indicate success or failure. If removal fails, pass an error as the one parameter to the reply handler. If removal succeeds, pass `nil`. For an `async` Swift implementation, there's no reply handler; simply throw an error or return normally.
+  message RemoveItem {
+    uint64 item_id = 1;
+    bytes name = 2;
+    uint64 directory_id = 3;
+  }
+
   // Renames an item from one path in the file system to another.
   //
   // Implement renaming along the lines of this algorithm:
@@ -155,16 +171,17 @@ message Request {
     SetAttributes set_attributes = 5;
     LookupItem lookup_item = 6;
     CreateItem create_item = 7;
-    RenameItem rename_item = 8;
-    EnumerateDirectory enumerate_directory = 9;
-    GetXattrOperations get_xattr_operations = 10;
-    GetXattr get_xattr = 11;
-    SetXattr set_xattr = 12;
-    GetXattrs get_xattrs = 13;
-    OpenItem open_item = 14;
-    CloseItem close_item = 15;
-    Read read = 16;
-    Write write = 17;
+    RemoveItem remove_item = 8;
+    RenameItem rename_item = 9;
+    EnumerateDirectory enumerate_directory = 10;
+    GetXattrOperations get_xattr_operations = 11;
+    GetXattr get_xattr = 12;
+    SetXattr set_xattr = 13;
+    GetXattrs get_xattrs = 14;
+    OpenItem open_item = 15;
+    CloseItem close_item = 16;
+    Read read = 17;
+    Write write = 18;
   }
 }
 

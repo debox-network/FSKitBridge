@@ -183,7 +183,7 @@ extension Volume: FSVolume.Operations {
     
     func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
         let item = item as! Item
-        logger.pubDebug("getAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
+        logger.pubDebug("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.GetAttributes()
         request.itemID = item.id
@@ -200,10 +200,8 @@ extension Volume: FSVolume.Operations {
     }
     
     func setAttributes(_ newAttributes: FSItem.SetAttributesRequest, on item: FSItem) async throws -> FSItem.Attributes {
-        guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("setAttributes: name = \(item.name.string ?? "") (id = \(item.id))")
+        let item = item as! Item
+        logger.pubDebug("setAttributes: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.SetAttributes()
         request.attributes = newAttributes.toProto()
@@ -221,10 +219,8 @@ extension Volume: FSVolume.Operations {
     }
     
     func lookupItem(named name: FSFileName, inDirectory directory: FSItem) async throws -> (FSItem, FSFileName) {
-        guard let directory = directory as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("lookupItem: directory = \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        let directory = directory as! Item
+        logger.pubDebug("lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.LookupItem()
         request.name = name.data
@@ -254,10 +250,8 @@ extension Volume: FSVolume.Operations {
     }
     
     func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
-        guard let directory = directory as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("createItem: directory = \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        let directory = directory as! Item
+        logger.pubDebug("createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.CreateItem()
         request.name = name.data
@@ -296,16 +290,24 @@ extension Volume: FSVolume.Operations {
         throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
     }
     
-    func removeItem(
-        _ item: FSItem,
-        named name: FSFileName,
-        fromDirectory directory: FSItem
-    ) async throws {
-        logger.debug("remove: \(name)")
-        if let item = item as? Item, let directory = directory as? Item {
-            //        directory.removeItem(item)
-        } else {
-            throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+    func removeItem(_ item: FSItem, named name: FSFileName, fromDirectory directory: FSItem) async throws {
+        let item = item as! Item
+        let directory = directory as! Item
+        logger.pubDebug("removeItem: \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Pb_Request.RemoveItem()
+        request.itemID = item.id
+        request.name = name.data
+        request.directoryID = directory.id
+        
+        switch try socket.send(content: .removeItem(request)) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("removeItem: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
     
@@ -339,7 +341,7 @@ extension Volume: FSVolume.Operations {
     
     func enumerateDirectory(_ directory: FSItem, startingAt cookie: FSDirectoryCookie, verifier: FSDirectoryVerifier, attributes: FSItem.GetAttributesRequest?, packer: FSDirectoryEntryPacker) async throws -> FSDirectoryVerifier {
         let directory = directory as! Item
-        logger.pubDebug("enumerateDirectory: name = \(directory.name.string ?? "") (id = \(directory.id))")
+        logger.pubDebug("enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))")
         
         var request = Pb_Request.EnumerateDirectory()
         request.directoryID = directory.id
@@ -383,10 +385,8 @@ extension Volume: FSVolume.XattrOperations {
     }
     
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
-        guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("getXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        let item = item as! Item
+        logger.pubDebug("getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.GetXattr()
         request.name = name.data
@@ -405,7 +405,7 @@ extension Volume: FSVolume.XattrOperations {
     
     func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
         let item = item as! Item
-        logger.pubDebug("setXattr: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        logger.pubDebug("setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.SetXattr()
         request.name = name.data
@@ -427,10 +427,8 @@ extension Volume: FSVolume.XattrOperations {
     }
     
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
-        guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("getXattrs: name = \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        let item = item as! Item
+        logger.pubDebug("getXattrs: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.GetXattrs()
         request.itemID = item.id
@@ -454,7 +452,7 @@ extension Volume: FSVolume.XattrOperations {
 extension Volume: FSVolume.OpenCloseOperations {
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
-        logger.pubDebug("openItem: name = \(item.name.string ?? "") (id = \(item.id))")
+        logger.pubDebug("openItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.OpenItem()
         request.itemID = item.id
@@ -472,10 +470,8 @@ extension Volume: FSVolume.OpenCloseOperations {
     }
     
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
-        guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
-        logger.pubDebug("closeItem: name = \(item.name.string ?? "") (id = \(item.id))")
+        let item = item as! Item
+        logger.pubDebug("closeItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.CloseItem()
         request.itemID = item.id
@@ -496,7 +492,7 @@ extension Volume: FSVolume.OpenCloseOperations {
 extension Volume: FSVolume.ReadWriteOperations {
     func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
         let item = item as! Item
-        logger.pubDebug("read: name = \(item.name.string ?? "") (id = \(item.id))")
+        logger.pubDebug("read: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.Read()
         request.itemID = item.id
@@ -522,7 +518,7 @@ extension Volume: FSVolume.ReadWriteOperations {
     
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
         let item = item as! Item
-        logger.pubDebug("write: name = \(item.name.string ?? "") (id = \(item.id))")
+        logger.pubDebug("write: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.Write()
         request.contents = contents
