@@ -16,6 +16,9 @@ final class Socket: @unchecked Sendable {
     
     func connect(host: String, port: Int) throws {
         let bootstrap = ClientBootstrap(group: group)
+            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
             .channelInitializer { channel in
                 channel.pipeline.addHandler(ByteToMessageHandler(LengthDelimitedDecoder()))
                     .flatMap {

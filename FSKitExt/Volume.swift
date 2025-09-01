@@ -14,6 +14,8 @@ final class Volume: FSVolume {
     private var volumeCapabilities: Pb_VolumeCapabilities!
     private var xattrOperations: Pb_XattrOperations!
     
+    private var items: [UInt64: Item] = [:]
+    
     private let root: Item = {
         var attrs = Pb_ItemAttributes()
         attrs.parentID = 1
@@ -138,7 +140,6 @@ extension Volume: FSVolume.PathConfOperations {
 }
 
 extension Volume: FSVolume.Operations {
-    
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
         FSVolume.SupportedCapabilities(volumeCapabilities)
     }
@@ -231,8 +232,13 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            let item = Item(item)
-            return (item, item.name)
+            if let item = items[item.attributes.fileID] {
+                return (item, item.name)
+            } else {
+                let item = Item(item)
+                items[item.id] = item
+                return (item, item.name)
+            }
         case .posixError(let error):
             logger.error("lookupItem: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
@@ -242,7 +248,21 @@ extension Volume: FSVolume.Operations {
     }
     
     func reclaimItem(_ item: FSItem) async throws {
-        logger.debug("reclaimItem: \(item)")
+        let item = item as! Item
+        logger.pubDebug("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Pb_Request.ReclaimItem()
+        request.itemID = item.id
+        
+        switch try socket.send(content: .reclaimItem(request)) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("reclaimItem: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func readSymbolicLink(
@@ -265,6 +285,7 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .createItem(request)) {
         case .item(let item):
             let item = Item(item)
+            items[item.id] = item
             return (item, item.name)
         case .posixError(let error):
             logger.error("createItem: failure (error = \(error.code))")

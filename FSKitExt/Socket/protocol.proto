@@ -28,6 +28,26 @@ message Request {
     uint64 directory_id = 2;
   }
 
+  // Reclaims an item, releasing any resources allocated for the item.
+  //
+  // FSKit guarantees that for every ``FSItem`` returned by the volume, a corresponding reclaim operation occurs
+  // after the upper layers no longer reference that item.
+  //
+  // > Note: Block device file systems may assess whether an underlying resource terminates before processing reclaim
+  // operations. On unary file systems, for example, the associated volumes unmount when such resources disconnect
+  // from the system. The unmount triggers a reclaiming of all items. Some implementations benefit greatly
+  // from short-circuiting in such cases. With a terminated resource, all I/O results in an error,
+  // making short-circuiting the most efficient response.
+  //
+  // - Parameters:
+  //   - item: The item to reclaim.
+  //   - reply: A block or closure to indicate success or failure. If removal fails, pass an error as the one parameter
+  //   to the reply handler. If removal succeeds, pass `nil`. For an `async` Swift implementation,
+  //   there's no reply handler; simply throw an error or return normally.
+  message ReclaimItem {
+    uint64 item_id = 1;
+  }
+
   // Creates a new file or directory item.
   message CreateItem {
     bytes name = 1;
@@ -170,18 +190,19 @@ message Request {
     GetAttributes get_attributes = 4;
     SetAttributes set_attributes = 5;
     LookupItem lookup_item = 6;
-    CreateItem create_item = 7;
-    RemoveItem remove_item = 8;
-    RenameItem rename_item = 9;
-    EnumerateDirectory enumerate_directory = 10;
-    GetXattrOperations get_xattr_operations = 11;
-    GetXattr get_xattr = 12;
-    SetXattr set_xattr = 13;
-    GetXattrs get_xattrs = 14;
-    OpenItem open_item = 15;
-    CloseItem close_item = 16;
-    Read read = 17;
-    Write write = 18;
+    ReclaimItem reclaim_item = 7;
+    CreateItem create_item = 8;
+    RemoveItem remove_item = 9;
+    RenameItem rename_item = 10;
+    EnumerateDirectory enumerate_directory = 11;
+    GetXattrOperations get_xattr_operations = 12;
+    GetXattr get_xattr = 13;
+    SetXattr set_xattr = 14;
+    GetXattrs get_xattrs = 15;
+    OpenItem open_item = 16;
+    CloseItem close_item = 17;
+    Read read = 18;
+    Write write = 19;
   }
 }
 
