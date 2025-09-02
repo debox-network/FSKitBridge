@@ -256,6 +256,7 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .reclaimItem(request)) {
         case .success(_):
+            items.removeValue(forKey: item.id)
             return
         case .posixError(let error):
             logger.error("reclaimItem: failure (error = \(error.code))")
@@ -265,11 +266,22 @@ extension Volume: FSVolume.Operations {
         }
     }
     
-    func readSymbolicLink(
-        _ item: FSItem
-    ) async throws -> FSFileName {
-        logger.debug("readSymbolicLink: \(item)")
-        throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+    func readSymbolicLink(_ item: FSItem) async throws -> FSFileName {
+        let item = item as! Item
+        logger.pubDebug("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
+        
+        var request = Pb_Request.ReadSymbolicLink()
+        request.itemID = item.id
+        
+        switch try socket.send(content: .readSymbolicLink(request)) {
+        case .data(let data):
+            return FSFileName(data: data)
+        case .posixError(let error):
+            logger.error("readSymbolicLink: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
@@ -295,14 +307,27 @@ extension Volume: FSVolume.Operations {
         }
     }
     
-    func createSymbolicLink(
-        named name: FSFileName,
-        inDirectory directory: FSItem,
-        attributes newAttributes: FSItem.SetAttributesRequest,
-        linkContents contents: FSFileName
-    ) async throws -> (FSItem, FSFileName) {
-        logger.debug("createSymbolicLink: \(name)")
-        throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
+    func createSymbolicLink(named name: FSFileName, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest, linkContents contents: FSFileName) async throws -> (FSItem, FSFileName) {
+        let directory = directory as! Item
+        logger.pubDebug("createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        
+        var request = Pb_Request.CreateSymbolicLink()
+        request.name = name.data
+        request.directoryID = directory.id
+        request.newAttributes = newAttributes.toProto()
+        request.contents = contents.data
+        
+        switch try socket.send(content: .createSymbolicLink(request)) {
+        case .item(let item):
+            let item = Item(item)
+            items[item.id] = item
+            return (item, item.name)
+        case .posixError(let error):
+            logger.error("createSymbolicLink: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func createLink(
