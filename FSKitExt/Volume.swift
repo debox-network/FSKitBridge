@@ -213,7 +213,8 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .setAttributes(request)) {
         case .itemAttributes(let attributes):
-            return FSItem.Attributes(attributes)
+            item.updateAttributes(attributes: attributes)
+            return item.attributes
         case .posixError(let error):
             logger.error("setAttributes: failure (error = \(error.code))")
             throw fs_errorForPOSIXError(error.code)
@@ -232,8 +233,10 @@ extension Volume: FSVolume.Operations {
         
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            if let item = items[item.attributes.fileID] {
-                return (item, item.name)
+            if let item_ = items[item.attributes.fileID] {
+                item_.updateName(name: item.name)
+                item_.updateAttributes(attributes: item.attributes)
+                return (item_, item_.name)
             } else {
                 let item = Item(item)
                 items[item.id] = item
