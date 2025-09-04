@@ -11,6 +11,57 @@ message Request {
   // A property that provides the supported capabilities of the volume.
   message GetVolumeCapabilities {}
 
+  // A property that provides up-to-date statistics of the volume.
+  message GetVolumeStatistics {}
+
+  // Mounts this volume, using the specified options.
+  //
+  // FSKit calls this method as a signal that some process is trying to mount this volume.
+  // Your file system receives a call to ``activate(options:replyHandler:)`` prior to receiving any mount calls.
+  //
+  // - Parameters:
+  //   - options: Options to apply to the mount. These can include security-scoped file paths.
+  //              There are no defined options currently.
+  //   - reply: A block or closure to indicate success or failure. If mounting fails,
+  //            pass an error as the one parameter to the reply handler. If mounting succeeds, pass `nil`.
+  //            For an `async` Swift implementation, there's no reply handler; simply return normally.
+  message Mount {
+    TaskOptions options = 1;
+  }
+
+  // Unmounts this volume.
+  //
+  // Clear and flush all cached state in your implementation of this method.
+  //
+  // - Parameters:
+  //   - reply: A block or closure to indicate success or failure. If unmounting fails,
+  //            pass an error as the one parameter to the reply handler. If unmounting succeeds, pass `nil`.
+  //            For an `async` Swift implementation, there's no reply handler; simply return normally.
+  message Unmount {}
+
+  // Synchronizes the volume with its underlying resource.
+  //
+  // After calling this method, FSKit assumes that the volume has sent all pending I/O or metadata to its resource.
+  //
+  // - Parameters:
+  //   - flags: Timing flags, as defined in `mount.h.` These flags let the file system know whether to run
+  //     the operation in a blocking or nonblocking fashion.
+  //   - reply: A block or closure to indicate success or failure. If synchronization fails, pass an error
+  //     as the one parameter to the reply handler. If synchronization succeeds, pass `nil`.
+  //     For an `async` Swift implementation, there's no reply handler; simply throw an error or return normally.
+  message Synchronize {
+    // Behavior flags for use with synchronization calls.
+    //
+    // These values are based on flags defined in `mount.h`. Since there are system-defined flags that are valid
+    // in the kernel but not in FSKit, this type defines its members as options rather than use an enumeration.
+    //
+    // - Values:
+    //   - wait = 1: A flag for synchronized I/O with file-integrity completion.
+    //   - noWait = 2: A flag for synchronized I/O that starts I/O but doesn't wait for it.
+    //   - dWait = 4: A flag for synchronized I/O with data-integrity completion.
+    uint32 flags = 1;
+  }
+
   // Fetches attributes for the given item.
   message GetAttributes {
     uint64 item_id = 1;
@@ -158,6 +209,47 @@ message Request {
     uint64 verifier = 3;
   }
 
+  // Activates the volume using the specified options.
+  //
+  // When FSKit calls this method, allocate any in-memory state required to represent the file system.
+  // Also allocate an ``FSItem`` for the root directory of the file system, and pass it to the reply block.
+  // FSKit caches this root item for the lifetime of the volume, and uses it as a starting point for all file look-ups.
+  //
+  // Volume activation occurs prior to any call to mount the volume.
+  //
+  // - Parameters:
+  //   - options: Options to apply to the activation. These can include security-scoped file paths.
+  //              There are no defined options currently.
+  //   - reply: A block or closure to indicate success or failure.
+  //            If activation succeeds, pass the root ``FSItem`` and a `nil` error.
+  //            If activation fails, pass the relevant error as the second parameter;
+  //            FSKit ignores any ``FSItem`` in this case. In Swift, `reply` takes only the ``FSItem`` as the parameter;
+  //            you signal any error with a `throw`. For an `async` Swift implementation, there's no reply handler;
+  //            simply return the ``FSItem`` or throw an error.
+  message Activate {
+    TaskOptions options = 1;
+  }
+
+  // Tears down a previously initialized volume instance.
+  //
+  // Set up your implementation to release any resources allocated for the volume instance.
+  // By the time you receive this callback, FSKit has already performed a reclaim call to release all other file nodes
+  // associated with this file system instance.
+  //
+  // Avoid performing any I/O in this method.
+  // Prior to calling this method, FSKit has already issued a sync call to perform any
+  // cleanup-related I/O.
+  //
+  // FSKit unmounts any mounted volume with a call to ``unmount(replyHandler:)`` prior to the deactivate callback.
+  //
+  // - Parameters:
+  //   - options: Options to apply to the deactivation.
+  //   - reply: A block or closure to indicate success or failure.
+  //            If activation fails, pass an error as the one parameter to the reply handler.
+  //            If activation succeeds, pass `nil`. For an `async` Swift implementation, there's no reply handler;
+  //            simply throw an error or return normally.
+  message Deactivate {}
+
   // Properties implemented by volumes that natively or partially support extended attributes.
   message GetXattrOperations {}
 
@@ -221,82 +313,56 @@ message Request {
   oneof content {
     GetPathConfOperations get_path_conf_operations = 2;
     GetVolumeCapabilities get_volume_capabilities = 3;
-    GetAttributes get_attributes = 4;
-    SetAttributes set_attributes = 5;
-    LookupItem lookup_item = 6;
-    ReclaimItem reclaim_item = 7;
-    ReadSymbolicLink read_symbolic_link = 8;
-    CreateItem create_item = 9;
-    CreateSymbolicLink create_symbolic_link = 10;
-    RemoveItem remove_item = 11;
-    RenameItem rename_item = 12;
-    EnumerateDirectory enumerate_directory = 13;
-    GetXattrOperations get_xattr_operations = 14;
-    GetXattr get_xattr = 15;
-    SetXattr set_xattr = 16;
-    GetXattrs get_xattrs = 17;
-    OpenItem open_item = 18;
-    CloseItem close_item = 19;
-    Read read = 20;
-    Write write = 21;
+    GetVolumeStatistics get_volume_statistics = 4;
+    Mount mount = 5;
+    Unmount unmount = 6;
+    Synchronize synchronize = 7;
+    GetAttributes get_attributes = 8;
+    SetAttributes set_attributes = 9;
+    LookupItem lookup_item = 10;
+    ReclaimItem reclaim_item = 11;
+    ReadSymbolicLink read_symbolic_link = 12;
+    CreateItem create_item = 13;
+    CreateSymbolicLink create_symbolic_link = 14;
+    RemoveItem remove_item = 15;
+    RenameItem rename_item = 16;
+    EnumerateDirectory enumerate_directory = 17;
+    Activate activate = 18;
+    Deactivate deactivate = 19;
+    GetXattrOperations get_xattr_operations = 20;
+    GetXattr get_xattr = 21;
+    SetXattr set_xattr = 22;
+    GetXattrs get_xattrs = 23;
+    OpenItem open_item = 24;
+    CloseItem close_item = 25;
+    Read read = 26;
+    Write write = 27;
   }
 }
 
+/// A class that passes command options to a task, optionally providing security-scoped URLs.
+message TaskOptions {
+  /// An array of strings that represent command-line options for the task.
+  ///
+  /// This property is equivalent to the `argv` array of C strings passed to a command-line tool.
+  repeated string task_options = 1;
+}
+
 message Response {
-  // Successful result
-  message Success {}
-
-  // A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
-  message Item {
-    // Attributes of an item, such as size, creation and modification times, and user and group identifiers.
-    ItemAttributes attributes = 1;
-
-    // The name of a file, expressed as a data buffer.
-    bytes name = 2;
-  }
-
-  // An object used to provide items during a directory enumeration.
-  message DirectoryEntries {
-    // An object used to provide item during a directory enumeration.
-    message Entry {
-      // A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
-      Item item = 1;
-
-      // A value to indicate the next entry in the directory to enumerate.
-      uint64 next_cookie = 2;
-    }
-
-    // List of entries.
-    repeated Entry entries = 1;
-
-    // A tool to detect whether the directory contents changed since the last call to `enumerateDirectory`.
-    uint64 verifier = 2;
-  }
-
-  // List of extended attributes.
-  message Xattrs {
-    // The extended attribute name.
-    repeated bytes names = 1;
-  }
-
-  // POSIX/BSD errors
-  message PosixError {
-    int32 code = 1;
-  }
-
   uint64 request_id = 1;
   oneof content {
     PathConfOperations path_conf_operations = 2;
     VolumeCapabilities volume_capabilities = 3;
-    ItemAttributes item_attributes = 4;
-    Item item = 5;
-    DirectoryEntries directory_entries = 6;
-    XattrOperations xattr_operations = 7;
-    Xattrs xattrs = 8;
-    bytes data = 9;
-    int64 byte_count = 10;
-    Success success = 11;
-    PosixError posix_error = 12;
+    StatFSResult stat_fs_result = 4;
+    ItemAttributes item_attributes = 5;
+    Item item = 6;
+    DirectoryEntries directory_entries = 7;
+    XattrOperations xattr_operations = 8;
+    Xattrs xattrs = 9;
+    bytes data = 10;
+    int64 byte_count = 11;
+    Success success = 12;
+    PosixError posix_error = 13;
   }
 }
 
@@ -308,7 +374,6 @@ message Response {
 //
 // Properties that represent limits and have a numeric type use `-1` to represent no limit.
 message PathConfOperations {
-
   // A property that represents the maximum number of hard links to the object.
   int64 maximum_link_count = 1;
 
@@ -339,7 +404,6 @@ message PathConfOperations {
   // FSKit automatically converts from one to another if needed.
   // If you implement both, FSKit uses only the `maximumXattrSizeInBits` implementation.
   optional int64 maximum_xattr_size_in_bits = 6;
-
 
   // The maximum size of a regular file allowed in the volume.
   //
@@ -452,14 +516,73 @@ message VolumeCapabilities {
   optional CaseFormat case_format = 20;
 }
 
-// Properties implemented by volumes that natively or partially support extended attributes.
-message XattrOperations {
-
-  // A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
+// A type used to report a volume's statistics.
+//
+// The names of this type's properties match those in the `statfs` structure in `statfs(2)`,
+// which reports these values for an FSKit file system.
+// All numeric properties default to `0`.
+// Override these values, unless a given property has no meaningful value to provide.
+//
+// > Note: Available space, free space, total space, and used space have properties to express their values
+// either as a number of blocks or a number of bytes.
+// Your module may supply both of these values by setting both the relevant block or byte property.
+// Alternatively, a module may set only one of the two properties.
+// When you do this, FSKit calculates the matching value based on ``blockSize``.
+//
+// For the read-only ``fileSystemTypeName``, set this value with the designated initializer.
+message StatFSResult {
+  // A property for the volume's block size, in bytes.
   //
-  // FSKit reads this value after the file system replies to the `loadResource` message.
-  // Changing the returned value during the runtime of the volume has no effect.
-  optional bool xattr_operations_inhibited = 1;
+  // This value defaults to `4096`. Zero isn't a valid block size.
+  int64 block_size = 1;
+
+  // A property for the optimal block size with which to perform I/O.
+  //
+  // For best performance, specify an `ioSize` that's an even multiple of ``blockSize``.
+  int64 io_size = 2;
+
+  // A property for the volume's total data block count.
+  uint64  total_blocks = 3;
+
+  // A property for the number of free blocks available to a non-superuser on the volume.
+  uint64 available_blocks = 4;
+
+  // A property for the number of free blocks in the volume.
+  uint64 free_blocks = 5;
+
+  // A property for the number of used blocks in the volume.
+  uint64 used_blocks = 6;
+
+  // A property for the total size, in bytes, of the volume.
+  uint64  total_bytes = 7;
+
+  // A property for the amount of space available to users, in bytes, in the volume.
+  uint64 available_bytes = 8;
+
+  // A property for the amount of free space, in bytes, in the volume.
+  uint64 free_bytes = 9;
+
+  // A property for the amount of used space, in bytes, in the volume.
+  uint64  used_bytes = 10;
+
+  // A property for the total number of file slots in the volume,
+  uint64 total_files = 11;
+
+  // A property for the total number of free file slots in the volume.
+  uint64 free_files = 12;
+
+  // A property for the file system's subtype or flavor.
+  //
+  // Match this value to the `FSPersonalities`'s `FSSubType` attribute, if it exists within
+  // the `EXAppExtensionAttributes` dictionary of the module's `Info.plist`.
+  int64  file_system_sub_type = 13;
+
+  // A property for the file system type name.
+  //
+  // Match this value to the `FSShortName` attribute within the `EXAppExtensionAttributes`
+  // dictionary of the module's `Info.plist`.
+  // The maximum allowed length is `MFSTYPENAMELEN`, including the terminating `NUL` character.
+  string  file_system_type_name = 14;
 }
 
 // Attributes of an item, such as size, creation and modification times, and user and group identifiers.
@@ -526,6 +649,56 @@ message ItemAttributes {
 
   // The item's last-backup time.
   optional google.protobuf.Timestamp backup_time = 18;
+}
+
+// A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
+message Item {
+  // Attributes of an item, such as size, creation and modification times, and user and group identifiers.
+  ItemAttributes attributes = 1;
+
+  // The name of a file, expressed as a data buffer.
+  bytes name = 2;
+}
+
+// An object used to provide items during a directory enumeration.
+message DirectoryEntries {
+  // An object used to provide item during a directory enumeration.
+  message Entry {
+    // A distinct object in a file hierarchy, such as a file, directory, symlink, socket, and more.
+    Item item = 1;
+
+    // A value to indicate the next entry in the directory to enumerate.
+    uint64 next_cookie = 2;
+  }
+
+  // List of entries.
+  repeated Entry entries = 1;
+
+  // A tool to detect whether the directory contents changed since the last call to `enumerateDirectory`.
+  uint64 verifier = 2;
+}
+
+// Properties implemented by volumes that natively or partially support extended attributes.
+message XattrOperations {
+  // A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
+  //
+  // FSKit reads this value after the file system replies to the `loadResource` message.
+  // Changing the returned value during the runtime of the volume has no effect.
+  optional bool xattr_operations_inhibited = 1;
+}
+
+// List of extended attributes.
+message Xattrs {
+  // The extended attribute name.
+  repeated bytes names = 1;
+}
+
+// Successful result.
+message Success {}
+
+// POSIX/BSD errors.
+message PosixError {
+  int32 code = 1;
 }
 
 // An enumeration of case-sensitivity support types.

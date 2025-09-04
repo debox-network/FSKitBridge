@@ -16,26 +16,8 @@ final class Volume: FSVolume {
     
     private var items: [UInt64: Item] = [:]
     
-    private let root: Item = {
-        var attrs = Pb_ItemAttributes()
-        attrs.parentID = 1
-        attrs.fileID = 2
-        attrs.uid = 0
-        attrs.gid = 0
-        attrs.linkCount = 1
-        attrs.type = .directory
-        attrs.mode = UInt32(S_IFDIR | 0b111_000_000)
-        attrs.allocSize = 1
-        attrs.size = 1
-        var item = Pb_Response.Item()
-        item.attributes = attrs
-        item.name = Data("/".utf8)
-        return Item(item)
-    }()
-    
     init(resource: FSResource) {
         self.resource = resource
-        
         super.init(
             volumeID: FSVolume.Identifier(uuid: Constants.volumeIdentifier),
             volumeName: FSFileName(string: "Debox")
@@ -145,41 +127,62 @@ extension Volume: FSVolume.Operations {
     }
     
     var volumeStatistics: FSStatFSResult {
-        //logger.debug("volumeStatistics")
-        
-        let result = FSStatFSResult(fileSystemTypeName: "AppFS")
-        
-        result.blockSize = 1024000
-        result.ioSize = 1024000
-        result.totalBlocks = 1024000
-        result.availableBlocks = 1024000
-        result.freeBlocks = 1024000
-        result.totalFiles = 1024000
-        result.freeFiles = 1024000
-        
-        return result
-    }
-    
-    
-    func activate(options: FSTaskOptions) async throws -> FSItem {
-        logger.debug("activate")
-        return root
-    }
-    
-    func deactivate(options: FSDeactivateOptions = []) async throws {
-        logger.debug("deactivate")
+        logger.debug("getVolumeStatistics")
+        do {
+            let response = try socket.send(content: .getVolumeStatistics(Pb_Request.GetVolumeStatistics()))
+            if case let .statFsResult(value) = response {
+                return FSStatFSResult(value)
+            }
+        } catch {
+            logger.error("getVolumeStatistics: failure (error = \(error))")
+        }
+        return FSStatFSResult(fileSystemTypeName: "AppFS")
     }
     
     func mount(options: FSTaskOptions) async throws {
         logger.debug("mount")
+        
+        var request = Pb_Request.Mount()
+        request.options = options.toProto()
+        
+        switch try socket.send(content: .mount(request)) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("mount: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func unmount() async {
         logger.debug("unmount")
+        switch try? socket.send(content: .unmount(Pb_Request.Unmount())) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("unmount: failure (error = \(error.code))")
+        default:
+            logger.error("unmount: failure")
+        }
     }
     
     func synchronize(flags: FSSyncFlags) async throws {
-        //logger.debug("synchronize")
+        logger.pubDebug("synchronize")
+        
+        var request = Pb_Request.Synchronize()
+        request.flags = UInt32(flags.rawValue)
+        
+        switch try socket.send(content: .synchronize(request)) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("synchronize: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
     
     func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
@@ -423,6 +426,38 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
+    
+    func activate(options: FSTaskOptions) async throws -> FSItem {
+        logger.debug("activate")
+        
+        var request = Pb_Request.Activate()
+        request.options = options.toProto()
+        
+        switch try socket.send(content: .activate(request)) {
+        case .item(let item):
+            let item = Item(item)
+            items[item.id] = item
+            return item
+        case .posixError(let error):
+            logger.error("activate: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
+    
+    func deactivate(options: FSDeactivateOptions = []) async throws {
+        logger.debug("deactivate")
+        switch try socket.send(content: .deactivate(Pb_Request.Deactivate())) {
+        case .success(_):
+            return
+        case .posixError(let error):
+            logger.error("deactivate: failure (error = \(error.code))")
+            throw fs_errorForPOSIXError(error.code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+    }
 }
 
 extension Volume: FSVolume.XattrOperations {
@@ -653,6 +688,33 @@ extension FSVolume.SupportedCapabilities {
         if capabilities.hasCaseFormat {
             self.caseFormat = FSVolume.CaseFormat(rawValue: capabilities.caseFormat.rawValue)!
         }
+    }
+}
+
+extension FSStatFSResult {
+    convenience init(_ result: Pb_StatFSResult) {
+        self.init(fileSystemTypeName: result.fileSystemTypeName)
+        self.blockSize = Int(result.blockSize)
+        self.ioSize = Int(result.ioSize)
+        self.totalBlocks = result.totalBlocks
+        self.availableBlocks = result.availableBlocks
+        self.freeBlocks = result.freeBlocks
+        self.usedBlocks = result.usedBlocks
+        self.totalBytes = result.totalBytes
+        self.availableBytes = result.availableBytes
+        self.freeBytes = result.freeBytes
+        self.usedBytes = result.usedBytes
+        self.totalFiles = result.totalFiles
+        self.freeFiles = result.freeFiles
+        self.fileSystemSubType = Int(result.fileSystemSubType)
+    }
+}
+
+extension FSTaskOptions {
+    func toProto() -> Pb_TaskOptions {
+        var options = Pb_TaskOptions()
+        options.taskOptions = self.taskOptions
+        return options
     }
 }
 

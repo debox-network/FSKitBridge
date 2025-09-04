@@ -9,7 +9,7 @@ final class Item: FSItem {
     
     var id: UInt64 { attributes.fileID.rawValue }
     
-    init(_ item: Pb_Response.Item) {
+    init(_ item: Pb_Item) {
         self.name = FSFileName(data: item.name)
         self.attributes = FSItem.Attributes(item.attributes)
     }
