@@ -4,7 +4,7 @@ import os
 
 final class Volume: FSVolume {
     
-    private let logger = Logger(subsystem: "FSKitExt", category: "Volume")
+    private let log = Logger(subsystem: "FSKitExt", category: "Volume")
     
     private let socket = Socket.shared
     
@@ -31,47 +31,46 @@ final class Volume: FSVolume {
     }
     
     private func getPathConfOperations() -> Pb_PathConfOperations {
-        logger.debug("getPathConfOperations")
+        log.d("getPathConfOperations")
         do {
             let response = try socket.send(content: .getPathConfOperations(Pb_Request.GetPathConfOperations()))
             if case let .pathConfOperations(value) = response {
                 return value
             }
         } catch {
-            logger.error("getPathConfOperations: failure (error = \(error))")
+            log.e("getPathConfOperations: failure (error = \(error.localizedDescription))")
         }
         return Pb_PathConfOperations()
     }
     
     private func getVolumeCapabilities() -> Pb_VolumeCapabilities {
-        logger.debug("getVolumeCapabilities")
+        log.d("getVolumeCapabilities")
         do {
             let response = try socket.send(content: .getVolumeCapabilities(Pb_Request.GetVolumeCapabilities()))
             if case let .volumeCapabilities(value) = response {
                 return value
             }
         } catch {
-            logger.error("getVolumeCapabilities: failure (error = \(error))")
+            log.e("getVolumeCapabilities: failure (error = \(error.localizedDescription))")
         }
         return Pb_VolumeCapabilities()
     }
     
     private func getXattrOperations() -> Pb_XattrOperations {
-        logger.debug("getXattrOperations")
+        log.d("getXattrOperations")
         do {
             let response = try socket.send(content: .getXattrOperations(Pb_Request.GetXattrOperations()))
             if case let .xattrOperations(value) = response {
                 return value
             }
         } catch {
-            logger.error("getXattrOperations: failure (error = \(error))")
+            log.e("getXattrOperations: failure (error = \(error.localizedDescription))")
         }
         return Pb_XattrOperations()
     }
 }
 
 extension Volume: FSVolume.PathConfOperations {
-    
     var maximumLinkCount: Int {
         Int(pathConfOperations.maximumLinkCount)
     }
@@ -127,20 +126,20 @@ extension Volume: FSVolume.Operations {
     }
     
     var volumeStatistics: FSStatFSResult {
-        logger.debug("getVolumeStatistics")
+        log.d("getVolumeStatistics")
         do {
             let response = try socket.send(content: .getVolumeStatistics(Pb_Request.GetVolumeStatistics()))
             if case let .statFsResult(value) = response {
                 return FSStatFSResult(value)
             }
         } catch {
-            logger.error("getVolumeStatistics: failure (error = \(error))")
+            log.e("getVolumeStatistics: failure (error = \(error.localizedDescription))")
         }
         return FSStatFSResult(fileSystemTypeName: "AppFS")
     }
     
     func mount(options: FSTaskOptions) async throws {
-        logger.debug("mount")
+        log.d("mount")
         
         var request = Pb_Request.Mount()
         request.options = options.toProto()
@@ -149,7 +148,7 @@ extension Volume: FSVolume.Operations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("mount: failure (error = \(error.code))")
+            log.posixError("mount", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -157,19 +156,19 @@ extension Volume: FSVolume.Operations {
     }
     
     func unmount() async {
-        logger.debug("unmount")
+        log.d("unmount")
         switch try? socket.send(content: .unmount(Pb_Request.Unmount())) {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("unmount: failure (error = \(error.code))")
+            log.posixError("unmount", error)
         default:
-            logger.error("unmount: failure")
+            log.e("unmount: failure")
         }
     }
     
     func synchronize(flags: FSSyncFlags) async throws {
-        logger.pubDebug("synchronize")
+        log.d("synchronize")
         
         var request = Pb_Request.Synchronize()
         request.flags = UInt32(flags.rawValue)
@@ -178,7 +177,7 @@ extension Volume: FSVolume.Operations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("synchronize: failure (error = \(error.code))")
+            log.posixError("synchronize", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -189,7 +188,7 @@ extension Volume: FSVolume.Operations {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        logger.pubDebug("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.GetAttributes()
         request.itemID = item.id
@@ -199,7 +198,7 @@ extension Volume: FSVolume.Operations {
             item.updateAttributes(attributes: attributes)
             return item.attributes
         case .posixError(let error):
-            logger.error("getAttributes: failure (error = \(error.code))")
+            log.posixError("getAttributes", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -208,7 +207,7 @@ extension Volume: FSVolume.Operations {
     
     func setAttributes(_ newAttributes: FSItem.SetAttributesRequest, on item: FSItem) async throws -> FSItem.Attributes {
         let item = item as! Item
-        logger.pubDebug("setAttributes: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("setAttributes: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.SetAttributes()
         request.attributes = newAttributes.toProto()
@@ -219,7 +218,7 @@ extension Volume: FSVolume.Operations {
             item.updateAttributes(attributes: attributes)
             return item.attributes
         case .posixError(let error):
-            logger.error("setAttributes: failure (error = \(error.code))")
+            log.posixError("setAttributes", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -228,7 +227,7 @@ extension Volume: FSVolume.Operations {
     
     func lookupItem(named name: FSFileName, inDirectory directory: FSItem) async throws -> (FSItem, FSFileName) {
         let directory = directory as! Item
-        logger.pubDebug("lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        log.d("lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.LookupItem()
         request.name = name.data
@@ -246,7 +245,7 @@ extension Volume: FSVolume.Operations {
                 return (item, item.name)
             }
         case .posixError(let error):
-            logger.error("lookupItem: failure (error = \(error.code))")
+            log.posixError("lookupItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -255,7 +254,7 @@ extension Volume: FSVolume.Operations {
     
     func reclaimItem(_ item: FSItem) async throws {
         let item = item as! Item
-        logger.pubDebug("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.ReclaimItem()
         request.itemID = item.id
@@ -265,7 +264,7 @@ extension Volume: FSVolume.Operations {
             items.removeValue(forKey: item.id)
             return
         case .posixError(let error):
-            logger.error("reclaimItem: failure (error = \(error.code))")
+            log.posixError("reclaimItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -274,7 +273,7 @@ extension Volume: FSVolume.Operations {
     
     func readSymbolicLink(_ item: FSItem) async throws -> FSFileName {
         let item = item as! Item
-        logger.pubDebug("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.ReadSymbolicLink()
         request.itemID = item.id
@@ -283,7 +282,7 @@ extension Volume: FSVolume.Operations {
         case .data(let data):
             return FSFileName(data: data)
         case .posixError(let error):
-            logger.error("readSymbolicLink: failure (error = \(error.code))")
+            log.posixError("readSymbolicLink", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -292,7 +291,7 @@ extension Volume: FSVolume.Operations {
     
     func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
         let directory = directory as! Item
-        logger.pubDebug("createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        log.d("createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.CreateItem()
         request.name = name.data
@@ -306,7 +305,7 @@ extension Volume: FSVolume.Operations {
             items[item.id] = item
             return (item, item.name)
         case .posixError(let error):
-            logger.error("createItem: failure (error = \(error.code))")
+            log.posixError("createItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -315,7 +314,7 @@ extension Volume: FSVolume.Operations {
     
     func createSymbolicLink(named name: FSFileName, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest, linkContents contents: FSFileName) async throws -> (FSItem, FSFileName) {
         let directory = directory as! Item
-        logger.pubDebug("createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
+        log.d("createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
         
         var request = Pb_Request.CreateSymbolicLink()
         request.name = name.data
@@ -329,7 +328,7 @@ extension Volume: FSVolume.Operations {
             items[item.id] = item
             return (item, item.name)
         case .posixError(let error):
-            logger.error("createSymbolicLink: failure (error = \(error.code))")
+            log.posixError("createSymbolicLink", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -341,14 +340,14 @@ extension Volume: FSVolume.Operations {
         named name: FSFileName,
         inDirectory directory: FSItem
     ) async throws -> FSFileName {
-        logger.debug("createLink: \(name)")
+        log.d("createLink: \(name)")
         throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
     }
     
     func removeItem(_ item: FSItem, named name: FSFileName, fromDirectory directory: FSItem) async throws {
         let item = item as! Item
         let directory = directory as! Item
-        logger.pubDebug("removeItem: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("removeItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.RemoveItem()
         request.itemID = item.id
@@ -359,7 +358,7 @@ extension Volume: FSVolume.Operations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("removeItem: failure (error = \(error.code))")
+            log.posixError("removeItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -371,7 +370,7 @@ extension Volume: FSVolume.Operations {
         let sourceDirectory = sourceDirectory as! Item
         let destinationDirectory = destinationDirectory as! Item
         let overItem = overItem as? Item
-        logger.pubDebug("renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))")
+        log.d("renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.RenameItem()
         request.itemID = item.id
@@ -388,7 +387,7 @@ extension Volume: FSVolume.Operations {
             item.updateName(name: data)
             return item.name
         case .posixError(let error):
-            logger.error("renameItem: failure (error = \(error.code))")
+            log.posixError("renameItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -397,7 +396,7 @@ extension Volume: FSVolume.Operations {
     
     func enumerateDirectory(_ directory: FSItem, startingAt cookie: FSDirectoryCookie, verifier: FSDirectoryVerifier, attributes: FSItem.GetAttributesRequest?, packer: FSDirectoryEntryPacker) async throws -> FSDirectoryVerifier {
         let directory = directory as! Item
-        logger.pubDebug("enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))")
+        log.d("enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))")
         
         var request = Pb_Request.EnumerateDirectory()
         request.directoryID = directory.id
@@ -420,7 +419,7 @@ extension Volume: FSVolume.Operations {
             }
             return FSDirectoryVerifier(entries.verifier)
         case .posixError(let error):
-            logger.error("enumerateDirectory: failure (error = \(error.code))")
+            log.posixError("enumerateDirectory", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -428,7 +427,7 @@ extension Volume: FSVolume.Operations {
     }
     
     func activate(options: FSTaskOptions) async throws -> FSItem {
-        logger.debug("activate")
+        log.d("activate")
         
         var request = Pb_Request.Activate()
         request.options = options.toProto()
@@ -439,7 +438,7 @@ extension Volume: FSVolume.Operations {
             items[item.id] = item
             return item
         case .posixError(let error):
-            logger.error("activate: failure (error = \(error.code))")
+            log.posixError("activate", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -447,12 +446,12 @@ extension Volume: FSVolume.Operations {
     }
     
     func deactivate(options: FSDeactivateOptions = []) async throws {
-        logger.debug("deactivate")
+        log.d("deactivate")
         switch try socket.send(content: .deactivate(Pb_Request.Deactivate())) {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("deactivate: failure (error = \(error.code))")
+            log.posixError("deactivate", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -474,7 +473,7 @@ extension Volume: FSVolume.XattrOperations {
     
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         let item = item as! Item
-        logger.pubDebug("getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        log.d("getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.GetXattr()
         request.name = name.data
@@ -484,7 +483,7 @@ extension Volume: FSVolume.XattrOperations {
         case .data(let data):
             return data
         case .posixError(let error):
-            logger.error("getXattr: failure (error = \(error.code))")
+            log.posixError("getXattr", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -493,7 +492,7 @@ extension Volume: FSVolume.XattrOperations {
     
     func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
         let item = item as! Item
-        logger.pubDebug("setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        log.d("setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.SetXattr()
         request.name = name.data
@@ -507,7 +506,7 @@ extension Volume: FSVolume.XattrOperations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("setXattr: failure (error = \(error.code))")
+            log.posixError("setXattr", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -516,7 +515,7 @@ extension Volume: FSVolume.XattrOperations {
     
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
         let item = item as! Item
-        logger.pubDebug("getXattrs: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
+        log.d("getXattrs: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
         
         var request = Pb_Request.GetXattrs()
         request.itemID = item.id
@@ -529,7 +528,7 @@ extension Volume: FSVolume.XattrOperations {
             }
             return names
         case .posixError(let error):
-            logger.error("getXattr: failure (error = \(error.code))")
+            log.posixError("getXattrs", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -540,7 +539,7 @@ extension Volume: FSVolume.XattrOperations {
 extension Volume: FSVolume.OpenCloseOperations {
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
-        logger.pubDebug("openItem: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("openItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.OpenItem()
         request.itemID = item.id
@@ -550,7 +549,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("openItem: failure (error = \(error.code))")
+            log.posixError("openItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -559,7 +558,7 @@ extension Volume: FSVolume.OpenCloseOperations {
     
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
-        logger.pubDebug("closeItem: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("closeItem: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.CloseItem()
         request.itemID = item.id
@@ -569,7 +568,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         case .success(_):
             return
         case .posixError(let error):
-            logger.error("closeItem: failure (error = \(error.code))")
+            log.posixError("closeItem", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -580,7 +579,7 @@ extension Volume: FSVolume.OpenCloseOperations {
 extension Volume: FSVolume.ReadWriteOperations {
     func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
         let item = item as! Item
-        logger.pubDebug("read: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("read: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.Read()
         request.itemID = item.id
@@ -597,7 +596,7 @@ extension Volume: FSVolume.ReadWriteOperations {
                 return length
             }
         case .posixError(let error):
-            logger.error("read: failure (error = \(error.code))")
+            log.posixError("read", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -606,7 +605,7 @@ extension Volume: FSVolume.ReadWriteOperations {
     
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
         let item = item as! Item
-        logger.pubDebug("write: \(item.name.string ?? "") (id = \(item.id))")
+        log.d("write: \(item.name.string ?? "") (id = \(item.id))")
         
         var request = Pb_Request.Write()
         request.contents = contents
@@ -617,7 +616,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         case .byteCount(let count):
             return Int(count)
         case .posixError(let error):
-            logger.error("write: failure (error = \(error.code))")
+            log.posixError("write", error)
             throw fs_errorForPOSIXError(error.code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)

@@ -3,35 +3,22 @@ import FSKit
 
 @main
 struct FSKitExt : UnaryFileSystemExtension {
-    
-    private let logger = Logger(subsystem: "FSKitExt", category: "FSKitExt")
-    
-    private let socket = Socket.shared
-    
     var fileSystem : FSUnaryFileSystem & FSUnaryFileSystemOperations {
         BridgeFS()
-    }
-    
-    init() {
-   //     DispatchQueue.global().async { [self] in
-            do {
-                try socket.connect(host: Constants.localHost, port: Constants.localPort)
-                
-//                while true {
-//                    let message = "Hello \(Int.random(in: 100...999))"
-//                    try socket.sendTypeOne(message: message, count: Int32.random(in: 1...10))
-//                    Thread.sleep(forTimeInterval: 5)
-//                }
-            } catch {
-                logger.error("Socket error: \(error)")
-            }
-   //     }
     }
 }
 
 extension Logger {
-    func pubDebug(_ message: String) {
+    func d(_ message: String) {
         self.debug("\(message, privacy: .public)")
+    }
+    
+    func e(_ message: String) {
+        self.error("\(message, privacy: .public)")
+    }
+    
+    func posixError(_ function: String, _ error: Pb_PosixError) {
+        self.e("\(function): failure (error = \(error.code))")
     }
 }
 

@@ -7,32 +7,26 @@ final class Socket: @unchecked Sendable {
     
     static let shared = Socket()
     
-    private let logger = Logger(subsystem: "FSKitExt", category: "Socket.Socket")
+    private let log = Logger(subsystem: "FSKitExt", category: "Socket.Socket")
     
+    private var host: String!
+    private var port: Int!
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
     private var pendingPromises: [UInt64: EventLoopPromise<Pb_Response.OneOf_Content>] = [:]
     private let lock = NSLock()
     
     func connect(host: String, port: Int) throws {
-        let bootstrap = ClientBootstrap(group: group)
-            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
-            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
-            .channelInitializer { channel in
-                channel.pipeline.addHandler(ByteToMessageHandler(LengthDelimitedDecoder()))
-                    .flatMap {
-                        channel.pipeline.addHandler(ResponseRouter(self))
-                    }
-            }
-        channel = try bootstrap.connect(host: host, port: port).wait()
-        logger.info("Connected to \(host, privacy: .public):\(port)")
+        self.host = host
+        self.port = port
+        try reconnect()
     }
     
     func send(content: Pb_Request.OneOf_Content) throws -> Pb_Response.OneOf_Content {
-        guard let channel = self.channel else {
-            throw SocketError.notConnected
+        if !(channel?.isActive ?? false) {
+            try reconnect()
         }
+        let channel = self.channel!
         
         var request = Pb_Request()
         request.id = generateRequestID()
@@ -61,7 +55,7 @@ final class Socket: @unchecked Sendable {
         if let promise = pendingPromises.removeValue(forKey: requestID) {
             promise.succeed(response.content!)
         } else {
-            logger.error("No matching promise for requestID = \(requestID)")
+            log.e("No matching promise for requestID = \(requestID)")
         }
     }
     
@@ -69,12 +63,27 @@ final class Socket: @unchecked Sendable {
         do {
             try channel?.close().wait()
             try group.syncShutdownGracefully()
-            logger.info("Client shutdown")
+            log.d("Client shutdown")
         } catch {
-            logger.error("Shutdown error: \(error.localizedDescription, privacy: .public)")
+            log.e("Shutdown error: \(error.localizedDescription)")
         }
     }
     
+    private func reconnect() throws {
+        let bootstrap = ClientBootstrap(group: group)
+            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
+            .channelInitializer { channel in
+                channel.pipeline.addHandler(ByteToMessageHandler(LengthDelimitedDecoder()))
+                    .flatMap {
+                        channel.pipeline.addHandler(ResponseRouter(self))
+                    }
+            }
+        channel = try bootstrap.connect(host: host, port: port).wait()
+        log.d("Connected to \(host!):\(port!)")
+    }
+
     private func generateRequestID() -> UInt64 {
         return UInt64.random(in: 1...UInt64.max)
     }
@@ -84,7 +93,6 @@ enum SocketError: Error {
     case notConnected
     case invalidVarint
     case responseTimedOut
-    case missingRequestID
 }
 
 final class LengthDelimitedDecoder: ByteToMessageDecoder {
@@ -159,7 +167,7 @@ func encodeLengthDelimited<T: SwiftProtobuf.Message>(_ message: T, allocator: By
 final class ResponseRouter: ChannelInboundHandler {
     typealias InboundIn = ByteBuffer
     
-    private let logger = Logger(subsystem: "FSKitExt", category: "Socket.ResponseRouter")
+    private let log = Logger(subsystem: "FSKitExt", category: "Socket.ResponseRouter")
     
     private weak var socket: Socket?
     
@@ -173,12 +181,12 @@ final class ResponseRouter: ChannelInboundHandler {
             let response = try Pb_Response(serializedBytes: rawData)
             socket?.fulfillPromise(for: response.requestID, with: response)
         } catch {
-            logger.error("Failed to decode response: \(error.localizedDescription, privacy: .public)")
+            log.e("Failed to decode response: \(error.localizedDescription)")
         }
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        logger.error("Router error: \(error.localizedDescription, privacy: .public)")
+        log.e("Router error: \(error.localizedDescription)")
         context.close(promise: nil)
     }
 }

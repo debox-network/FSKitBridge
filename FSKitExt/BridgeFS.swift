@@ -4,27 +4,31 @@ import os
 
 final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     
-    private let logger = Logger(subsystem: "FSKitExt", category: "BridgeFS")
+    private let log = Logger(subsystem: "FSKitExt", category: "BridgeFS")
     
     func probeResource(resource: FSResource, replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void) {
-        logger.debug("probeResource: \(resource, privacy: .public)")
+        log.d("probeResource")
         replyHandler(FSProbeResult.usable(name: "Debox", containerID: FSContainerIdentifier(uuid: Constants.containerIdentifier)), nil )
     }
     
     func loadResource(resource: FSResource, options: FSTaskOptions, replyHandler: @escaping (FSVolume?, (any Error)?) -> Void) {
-        logger.debug("loadResource: \(resource, privacy: .public)")
+        log.d("loadResource")
+        
+        try? Socket.shared.connect(host: Constants.localHost, port: Constants.localPort)
+        
         let volume = Volume(resource: resource)
         volume.load()
+        
         containerStatus = .ready
         replyHandler(volume, nil)
     }
     
     func unloadResource(resource: FSResource, options: FSTaskOptions, replyHandler reply: @escaping ((any Error)?) -> Void) {
-        logger.debug("unloadResource: \(resource, privacy: .public)")
+        log.d("unloadResource")
         reply(nil)
     }
     
     func didFinishLoading() {
-        logger.debug("didFinishLoading")
+        log.d("didFinishLoading")
     }
 }
