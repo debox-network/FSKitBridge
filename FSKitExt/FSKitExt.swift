@@ -17,8 +17,8 @@ extension Logger {
         self.error("\(message, privacy: .public)")
     }
     
-    func posixError(_ function: String, _ error: Pb_PosixError) {
-        self.e("\(function): failure (error = \(error.code))")
+    func posixError(_ function: String, _ code: Int32) {
+        self.e("\(function): failure (code = \(code))")
     }
 }
 

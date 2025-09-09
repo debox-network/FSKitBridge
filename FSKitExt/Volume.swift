@@ -147,9 +147,9 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .mount(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("mount", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("mount", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -176,9 +176,9 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .synchronize(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("synchronize", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("synchronize", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -197,9 +197,9 @@ extension Volume: FSVolume.Operations {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
             return item.attributes
-        case .posixError(let error):
-            log.posixError("getAttributes", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("getAttributes", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -217,9 +217,9 @@ extension Volume: FSVolume.Operations {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
             return item.attributes
-        case .posixError(let error):
-            log.posixError("setAttributes", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("setAttributes", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -244,9 +244,9 @@ extension Volume: FSVolume.Operations {
                 items[item.id] = item
                 return (item, item.name)
             }
-        case .posixError(let error):
-            log.posixError("lookupItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("lookupItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -263,9 +263,9 @@ extension Volume: FSVolume.Operations {
         case .success(_):
             items.removeValue(forKey: item.id)
             return
-        case .posixError(let error):
-            log.posixError("reclaimItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("reclaimItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -281,9 +281,9 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .readSymbolicLink(request)) {
         case .data(let data):
             return FSFileName(data: data)
-        case .posixError(let error):
-            log.posixError("readSymbolicLink", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("readSymbolicLink", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -304,9 +304,9 @@ extension Volume: FSVolume.Operations {
             let item = Item(item)
             items[item.id] = item
             return (item, item.name)
-        case .posixError(let error):
-            log.posixError("createItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("createItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -327,9 +327,9 @@ extension Volume: FSVolume.Operations {
             let item = Item(item)
             items[item.id] = item
             return (item, item.name)
-        case .posixError(let error):
-            log.posixError("createSymbolicLink", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("createSymbolicLink", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -357,9 +357,9 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .removeItem(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("removeItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("removeItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -386,9 +386,9 @@ extension Volume: FSVolume.Operations {
         case .data(let data):
             item.updateName(name: data)
             return item.name
-        case .posixError(let error):
-            log.posixError("renameItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("renameItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -418,9 +418,9 @@ extension Volume: FSVolume.Operations {
                 }
             }
             return FSDirectoryVerifier(entries.verifier)
-        case .posixError(let error):
-            log.posixError("enumerateDirectory", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("enumerateDirectory", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -437,9 +437,9 @@ extension Volume: FSVolume.Operations {
             let item = Item(item)
             items[item.id] = item
             return item
-        case .posixError(let error):
-            log.posixError("activate", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("activate", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -450,9 +450,9 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .deactivate(Pb_Request.Deactivate())) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("deactivate", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("deactivate", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -482,9 +482,9 @@ extension Volume: FSVolume.XattrOperations {
         switch try socket.send(content: .getXattr(request)) {
         case .data(let data):
             return data
-        case .posixError(let error):
-            log.posixError("getXattr", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("getXattr", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -505,9 +505,9 @@ extension Volume: FSVolume.XattrOperations {
         switch try socket.send(content: .setXattr(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("setXattr", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("setXattr", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -527,9 +527,9 @@ extension Volume: FSVolume.XattrOperations {
                 names.append(FSFileName(data: name))
             }
             return names
-        case .posixError(let error):
-            log.posixError("getXattrs", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("getXattrs", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -548,9 +548,9 @@ extension Volume: FSVolume.OpenCloseOperations {
         switch try socket.send(content: .openItem(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("openItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("openItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -567,9 +567,9 @@ extension Volume: FSVolume.OpenCloseOperations {
         switch try socket.send(content: .closeItem(request)) {
         case .success(_):
             return
-        case .posixError(let error):
-            log.posixError("closeItem", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("closeItem", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -595,9 +595,9 @@ extension Volume: FSVolume.ReadWriteOperations {
                 }
                 return length
             }
-        case .posixError(let error):
-            log.posixError("read", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("read", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
@@ -615,9 +615,9 @@ extension Volume: FSVolume.ReadWriteOperations {
         switch try socket.send(content: .write(request)) {
         case .byteCount(let count):
             return Int(count)
-        case .posixError(let error):
-            log.posixError("write", error)
-            throw fs_errorForPOSIXError(error.code)
+        case .posixError(let code):
+            log.posixError("write", code)
+            throw fs_errorForPOSIXError(code)
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }

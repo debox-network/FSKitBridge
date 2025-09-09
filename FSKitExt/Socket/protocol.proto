@@ -362,7 +362,7 @@ message Response {
     bytes data = 10;
     int64 byte_count = 11;
     Success success = 12;
-    PosixError posix_error = 13;
+    int32 posix_error = 13;
   }
 }
 
@@ -695,11 +695,6 @@ message Xattrs {
 
 // Successful result.
 message Success {}
-
-// POSIX/BSD errors.
-message PosixError {
-  int32 code = 1;
-}
 
 // An enumeration of case-sensitivity support types.
 enum CaseFormat {
