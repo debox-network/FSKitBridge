@@ -8,19 +8,16 @@ final class Volume: FSVolume {
     
     private let socket = Socket.shared
     
-    private let resource: FSResource
-    
     private var pathConfOperations: Pb_PathConfOperations!
     private var volumeCapabilities: Pb_VolumeCapabilities!
     private var xattrOperations: Pb_XattrOperations!
     
     private var items: [UInt64: Item] = [:]
     
-    init(resource: FSResource) {
-        self.resource = resource
+    init(_ identifier: Pb_VolumeIdentifier) {
         super.init(
-            volumeID: FSVolume.Identifier(uuid: Constants.volumeIdentifier),
-            volumeName: FSFileName(string: "Debox")
+            volumeID: FSVolume.Identifier(uuid: UUID(uuidString: identifier.id) ?? UUID()),
+            volumeName: FSFileName(string: identifier.hasName ? identifier.name : Constants.volumeName)
         )
     }
     
@@ -135,7 +132,7 @@ extension Volume: FSVolume.Operations {
         } catch {
             log.e("getVolumeStatistics: failure (error = \(error.localizedDescription))")
         }
-        return FSStatFSResult(fileSystemTypeName: "AppFS")
+        return FSStatFSResult(fileSystemTypeName: Constants.volumeName)
     }
     
     func mount(options: FSTaskOptions) async throws {

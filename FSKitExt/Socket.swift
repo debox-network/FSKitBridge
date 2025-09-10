@@ -7,7 +7,7 @@ final class Socket: @unchecked Sendable {
     
     static let shared = Socket()
     
-    private let log = Logger(subsystem: "FSKitExt", category: "Socket.Socket")
+    private let log = Logger(subsystem: "FSKitExt", category: "Socket")
     
     private var host: String!
     private var port: Int!

@@ -6,21 +6,40 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     
     private let log = Logger(subsystem: "FSKitExt", category: "BridgeFS")
     
+    private let socket = Socket.shared
+    
+    override init() {
+        super.init()
+        try? Socket.shared.connect(host: Constants.localHost, port: Constants.localPort)
+    }
+    
     func probeResource(resource: FSResource, replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void) {
         log.d("probeResource")
-        replyHandler(FSProbeResult.usable(name: "Debox", containerID: FSContainerIdentifier(uuid: Constants.containerIdentifier)), nil )
+        do {
+            let response = try socket.send(content: .probeResource(Pb_Request.ProbeResource()))
+            if case let .probeResult(value) = response {
+                replyHandler(FSProbeResult.usable(name: value.name, containerID: FSContainerIdentifier(uuid: UUID(uuidString: value.containerID) ?? UUID())), nil)
+            }
+        } catch {
+            log.e("probeResource: failure (error = \(error.localizedDescription))")
+            replyHandler(nil, nil)
+        }
     }
     
     func loadResource(resource: FSResource, options: FSTaskOptions, replyHandler: @escaping (FSVolume?, (any Error)?) -> Void) {
         log.d("loadResource")
-        
-        try? Socket.shared.connect(host: Constants.localHost, port: Constants.localPort)
-        
-        let volume = Volume(resource: resource)
-        volume.load()
-        
-        containerStatus = .ready
-        replyHandler(volume, nil)
+        do {
+            let response = try socket.send(content: .getVolumeIdentifier(Pb_Request.GetVolumeIdentifier()))
+            if case let .volumeIdentifier(value) = response {
+                let volume = Volume(value)
+                volume.load()
+                containerStatus = .ready
+                replyHandler(volume, nil)
+            }
+        } catch {
+            log.e("loadResource: failure (error = \(error.localizedDescription))")
+            replyHandler(nil, nil)
+        }
     }
     
     func unloadResource(resource: FSResource, options: FSTaskOptions, replyHandler reply: @escaping ((any Error)?) -> Void) {
