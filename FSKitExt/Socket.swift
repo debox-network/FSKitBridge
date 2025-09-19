@@ -14,19 +14,16 @@ final class Socket: @unchecked Sendable {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
     private var pendingPromises: [UInt64: EventLoopPromise<Pb_Response.OneOf_Content>] = [:]
-    private let lock = NSLock()
+    private let channelLock = NSLock()
+    private let promiseLock = NSLock()
     
-    func connect(host: String, port: Int) throws {
+    func initialize(host: String, port: Int) {
         self.host = host
         self.port = port
-        try reconnect()
     }
     
     func send(content: Pb_Request.OneOf_Content) throws -> Pb_Response.OneOf_Content {
-        if !(channel?.isActive ?? false) {
-            try reconnect()
-        }
-        let channel = self.channel!
+        let channel = try getChannel()
         
         var request = Pb_Request()
         request.id = generateRequestID()
@@ -35,9 +32,9 @@ final class Socket: @unchecked Sendable {
         let buffer = try encodeLengthDelimited(request, allocator: channel.allocator)
         
         let promise = channel.eventLoop.makePromise(of: Pb_Response.OneOf_Content.self)
-        lock.lock()
+        promiseLock.lock()
         pendingPromises[request.id] = promise
-        lock.unlock()
+        promiseLock.unlock()
         
         let timeout = channel.eventLoop.scheduleTask(in: .seconds(5)) {
             promise.fail(SocketError.responseTimedOut)
@@ -50,8 +47,9 @@ final class Socket: @unchecked Sendable {
     }
     
     func fulfillPromise(for requestID: UInt64, with response: Pb_Response) {
-        lock.lock()
-        defer { lock.unlock() }
+        promiseLock.lock()
+        defer { promiseLock.unlock() }
+        
         if let promise = pendingPromises.removeValue(forKey: requestID) {
             promise.succeed(response.content!)
         } else {
@@ -69,21 +67,27 @@ final class Socket: @unchecked Sendable {
         }
     }
     
-    private func reconnect() throws {
-        let bootstrap = ClientBootstrap(group: group)
-            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
-            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
-            .channelInitializer { channel in
-                channel.pipeline.addHandler(ByteToMessageHandler(LengthDelimitedDecoder()))
-                    .flatMap {
-                        channel.pipeline.addHandler(ResponseRouter(self))
-                    }
-            }
-        channel = try bootstrap.connect(host: host, port: port).wait()
-        log.d("Connected to \(host!):\(port!)")
-    }
+    private func getChannel() throws -> Channel {
+        channelLock.lock()
+        defer { channelLock.unlock() }
 
+        if channel == nil || !channel!.isActive {
+            let bootstrap = ClientBootstrap(group: group)
+                .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+                .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+                .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
+                .channelInitializer { channel in
+                    channel.pipeline.addHandler(ByteToMessageHandler(LengthDelimitedDecoder()))
+                        .flatMap {
+                            channel.pipeline.addHandler(ResponseRouter(self))
+                        }
+                }
+            channel = try bootstrap.connect(host: host, port: port).wait()
+            log.d("Connected to \(host!):\(port!)")
+        }
+        return channel!
+    }
+    
     private func generateRequestID() -> UInt64 {
         return UInt64.random(in: 1...UInt64.max)
     }

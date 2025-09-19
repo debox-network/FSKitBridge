@@ -5,13 +5,8 @@ package pb;
 import "google/protobuf/timestamp.proto";
 
 message Request {
-  // Requests that the file system probe the specified resource.
-  //
-  // Implement this method to indicate whether the resource is recognizable and usable.
-  // - Parameters:
-  //   - resource: The ``FSResource`` to probe.
-  //   - replyHandler: A block or closure that your implementation invokes when it finishes the probe or encounters an error. Pass an instance of ``FSProbeResult`` with probe results as the first parameter if your probe operation succeeds. If probing fails, pass an error as the second parameter.
-  message ProbeResource {}
+  // Get the resource identifier and name.
+  message GetResourceIdentifier {}
 
   // Get the volume identifier and name.
   message GetVolumeIdentifier {}
@@ -322,7 +317,7 @@ message Request {
 
   uint64 id = 1;
   oneof content {
-    ProbeResource probe_resource = 2;
+    GetResourceIdentifier get_resource_identifier = 2;
     GetVolumeIdentifier get_volume_identifier = 3;
     GetPathConfOperations get_path_conf_operations = 4;
     GetVolumeCapabilities get_volume_capabilities = 5;
@@ -353,18 +348,18 @@ message Request {
   }
 }
 
-/// A class that passes command options to a task, optionally providing security-scoped URLs.
+// A class that passes command options to a task, optionally providing security-scoped URLs.
 message TaskOptions {
-  /// An array of strings that represent command-line options for the task.
-  ///
-  /// This property is equivalent to the `argv` array of C strings passed to a command-line tool.
+  // An array of strings that represent command-line options for the task.
+  //
+  // This property is equivalent to the `argv` array of C strings passed to a command-line tool.
   repeated string task_options = 1;
 }
 
 message Response {
   uint64 request_id = 1;
   oneof content {
-    ProbeResult probe_result = 2;
+    ResourceIdentifier resource_identifier = 2;
     VolumeIdentifier volume_identifier = 3;
     PathConfOperations path_conf_operations = 4;
     VolumeCapabilities volume_capabilities = 5;
@@ -381,19 +376,8 @@ message Response {
   }
 }
 
-// An object that represents the results of a specific probe.
-//
-// For any ``result`` value other than ``FSMatchResult/notRecognized``, ensure the ``name`` and ``containerID`` values are non-`nil`.
-// When a container or volume format doesn't use a name, return an empty string.
-// Also use an empty string in the case in which the format supports a name, but the value isn't set yet.
-//
-// Some container or volume formats may lack a durable UUID on which to base a container identifier.
-// This situation is only valid for unary file systems.
-// In such a case, return a random UUID.
-//
-// With a block device resource, a probe operation may successfully get a result but encounter an error reading the name or UUID.
-// If this happens, use whatever information is available, and provide an empty string or random UUID for the name or container ID, respectively.
-message ProbeResult {
+// The resource identifier and name.
+message ResourceIdentifier {
   // The resource name, as found during the probe operation.
   //
   // This value is non-`nil` unless the ``FSProbeResult/result`` is ``FSMatchResult/notRecognized`.

@@ -24,11 +24,13 @@ extension Logger {
 
 // log stream --info --debug --style syslog --predicate 'subsystem == "FSKitExt"'
 //
+// pluginkit -m -A -p com.apple.fskit.fsmodule
+//
 // mkfile -n 1m /tmp/fskit-rs.dmg
 // hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount /tmp/fskit-rs.dmg
 //
 // mkdir /tmp/vol
-// mount -F -t BridgeFS disk20 /tmp/vol
+// mount -F -t bridgefs /dev/disk22 /tmp/vol
 //
 // umount /tmp/vol
 //

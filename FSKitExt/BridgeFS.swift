@@ -10,20 +10,21 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     
     override init() {
         super.init()
-        try? Socket.shared.connect(host: Constants.localHost, port: Constants.localPort)
+        Socket.shared.initialize(host: Constants.localHost, port: Constants.localPort)
     }
     
     func probeResource(resource: FSResource, replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void) {
         log.d("probeResource")
         do {
-            let response = try socket.send(content: .probeResource(Pb_Request.ProbeResource()))
-            if case let .probeResult(value) = response {
+            let response = try socket.send(content: .getResourceIdentifier(Pb_Request.GetResourceIdentifier()))
+            if case let .resourceIdentifier(value) = response {
                 replyHandler(FSProbeResult.usable(name: value.name, containerID: FSContainerIdentifier(uuid: UUID(uuidString: value.containerID) ?? UUID())), nil)
+                return
             }
         } catch {
             log.e("probeResource: failure (error = \(error.localizedDescription))")
-            replyHandler(nil, nil)
         }
+        replyHandler(nil, nil)
     }
     
     func loadResource(resource: FSResource, options: FSTaskOptions, replyHandler: @escaping (FSVolume?, (any Error)?) -> Void) {
@@ -35,11 +36,12 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
                 volume.load()
                 containerStatus = .ready
                 replyHandler(volume, nil)
+                return
             }
         } catch {
             log.e("loadResource: failure (error = \(error.localizedDescription))")
-            replyHandler(nil, nil)
         }
+        replyHandler(nil, nil)
     }
     
     func unloadResource(resource: FSResource, options: FSTaskOptions, replyHandler reply: @escaping ((any Error)?) -> Void) {
