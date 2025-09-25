@@ -746,8 +746,20 @@ extension Volume: FSVolume.RenameOperations {
     }
 
     func setVolumeName(_ name: FSFileName) async throws -> FSFileName {
-        log.d("setVolumeName")
-        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        log.d("setVolumeName: \(name.string ?? "")")
+
+        var request = Pb_Request.SetVolumeName()
+        request.name = name.data
+
+        switch try socket.send(content: .setVolumeName(request)) {
+        case .data(let data):
+            return FSFileName(data: data)
+        case .posixError(let code):
+            log.posixError("setVolumeName", code)
+            throw fs_errorForPOSIXError(code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
 }
 

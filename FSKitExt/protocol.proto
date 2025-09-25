@@ -377,6 +377,10 @@ message Request {
     repeated AccessMask access = 2;
   }
 
+  message SetVolumeName {
+    bytes name = 1;
+  }
+
   uint64 id = 1;
   oneof content {
     GetResourceIdentifier get_resource_identifier = 2;
@@ -408,6 +412,7 @@ message Request {
     Read read = 28;
     Write write = 29;
     CheckAccess check_access = 30;
+    SetVolumeName set_volume_name = 31;
   }
 }
 
