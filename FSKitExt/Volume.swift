@@ -775,8 +775,24 @@ extension Volume: FSVolume.PreallocateOperations {
         length: Int,
         flags: FSVolume.PreallocateFlags
     ) async throws -> Int {
-        log.d("setVolumeName")
-        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        let item = item as! Item
+        log.d("preallocateSpace: \(item.name.string ?? "") (id = \(item.id))")
+
+        var request = Pb_Request.PreallocateSpace()
+        request.itemID = item.id
+        request.offset = offset
+        request.length = Int64(length)
+        request.flags = flags.toProto()
+
+        switch try socket.send(content: .preallocateSpace(request)) {
+        case .byteCount(let count):
+            return Int(count)
+        case .posixError(let code):
+            log.posixError("preallocateSpace", code)
+            throw fs_errorForPOSIXError(code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
 }
 
@@ -908,6 +924,17 @@ extension FSVolume.AccessMask {
         if self.contains(.readSecurity) { out.append(.readSecurity) }
         if self.contains(.writeSecurity) { out.append(.writeSecurity) }
         if self.contains(.takeOwnership) { out.append(.takeOwnership) }
+        return out.isEmpty ? [.none] : out
+    }
+}
+
+extension FSVolume.PreallocateFlags {
+    func toProto() -> [Pb_Request.PreallocateSpace.PreallocateFlags] {
+        var out: [Pb_Request.PreallocateSpace.PreallocateFlags] = []
+        if self.contains(.contiguous) { out.append(.contiguous) }
+        if self.contains(.all) { out.append(.all) }
+        if self.contains(.persist) { out.append(.persist) }
+        if self.contains(.fromEOF) { out.append(.fromEof) }
         return out.isEmpty ? [.none] : out
     }
 }
