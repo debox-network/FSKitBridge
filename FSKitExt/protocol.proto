@@ -11,6 +11,9 @@ message Request {
   // Get the volume identifier and name.
   message GetVolumeIdentifier {}
 
+  // Get properties that instruct FSKit not to call the protocol methods, even if the volume conforms to it.
+  message GetInhibitedOperations {}
+
   // Properties implemented by volumes that support providing the values of system limits or options.
   message GetPathConfOperations {}
 
@@ -256,9 +259,6 @@ message Request {
   //            simply throw an error or return normally.
   message Deactivate {}
 
-  // Properties implemented by volumes that natively or partially support extended attributes.
-  message GetXattrOperations {}
-
   // Gets the specified extended attribute of the given item.
   message GetXattr {
     // The extended attribute name.
@@ -319,25 +319,25 @@ message Request {
   oneof content {
     GetResourceIdentifier get_resource_identifier = 2;
     GetVolumeIdentifier get_volume_identifier = 3;
-    GetPathConfOperations get_path_conf_operations = 4;
-    GetVolumeCapabilities get_volume_capabilities = 5;
-    GetVolumeStatistics get_volume_statistics = 6;
-    Mount mount = 7;
-    Unmount unmount = 8;
-    Synchronize synchronize = 9;
-    GetAttributes get_attributes = 10;
-    SetAttributes set_attributes = 11;
-    LookupItem lookup_item = 12;
-    ReclaimItem reclaim_item = 13;
-    ReadSymbolicLink read_symbolic_link = 14;
-    CreateItem create_item = 15;
-    CreateSymbolicLink create_symbolic_link = 16;
-    RemoveItem remove_item = 17;
-    RenameItem rename_item = 18;
-    EnumerateDirectory enumerate_directory = 19;
-    Activate activate = 20;
-    Deactivate deactivate = 21;
-    GetXattrOperations get_xattr_operations = 22;
+    GetInhibitedOperations get_inhibited_operations = 4;
+    GetPathConfOperations get_path_conf_operations = 5;
+    GetVolumeCapabilities get_volume_capabilities = 6;
+    GetVolumeStatistics get_volume_statistics = 7;
+    Mount mount = 8;
+    Unmount unmount = 9;
+    Synchronize synchronize = 10;
+    GetAttributes get_attributes = 11;
+    SetAttributes set_attributes = 12;
+    LookupItem lookup_item = 13;
+    ReclaimItem reclaim_item = 14;
+    ReadSymbolicLink read_symbolic_link = 15;
+    CreateItem create_item = 16;
+    CreateSymbolicLink create_symbolic_link = 17;
+    RemoveItem remove_item = 18;
+    RenameItem rename_item = 19;
+    EnumerateDirectory enumerate_directory = 20;
+    Activate activate = 21;
+    Deactivate deactivate = 22;
     GetXattr get_xattr = 23;
     SetXattr set_xattr = 24;
     GetXattrs get_xattrs = 25;
@@ -361,13 +361,13 @@ message Response {
   oneof content {
     ResourceIdentifier resource_identifier = 2;
     VolumeIdentifier volume_identifier = 3;
-    PathConfOperations path_conf_operations = 4;
-    VolumeCapabilities volume_capabilities = 5;
-    StatFSResult stat_fs_result = 6;
-    ItemAttributes item_attributes = 7;
-    Item item = 8;
-    DirectoryEntries directory_entries = 9;
-    XattrOperations xattr_operations = 10;
+    InhibitedOperations inhibited_operations = 4;
+    PathConfOperations path_conf_operations = 5;
+    VolumeCapabilities volume_capabilities = 6;
+    StatFSResult stat_fs_result = 7;
+    ItemAttributes item_attributes = 8;
+    Item item = 9;
+    DirectoryEntries directory_entries = 10;
     Xattrs xattrs = 11;
     bytes data = 12;
     int64 byte_count = 13;
@@ -400,6 +400,24 @@ message VolumeIdentifier {
 
   // The name of the volume.
   optional string name = 2;
+}
+
+// Properties instruct FSKit not to call the protocol methods, even if the volume conforms to it.
+message InhibitedOperations {
+  // A Boolean value that instructs FSKit not to call ``XattrOperations`` protocol's methods.
+  optional bool xattr_operations_inhibited = 1;
+
+  // A Boolean value that instructs FSKit not to call ``OpenCloseOperations`` protocol's methods.
+  optional bool is_open_close_inhibited = 2;
+
+  // A Boolean value that instructs FSKit not to call ``AccessCheckOperations`` protocol's methods.
+  optional bool is_access_check_inhibited = 3;
+
+  // A Boolean value that instructs FSKit not to call ``RenameOperations`` protocol's methods.
+  optional bool is_volume_rename_inhibited = 4;
+
+  // A Boolean value that instructs FSKit not to call ``PreallocateOperations`` protocol's methods.
+  optional bool is_preallocate_inhibited = 5;
 }
 
 // Properties implemented by volumes that support providing the values of system limits or options.
@@ -712,15 +730,6 @@ message DirectoryEntries {
 
   // A tool to detect whether the directory contents changed since the last call to `enumerateDirectory`.
   uint64 verifier = 2;
-}
-
-// Properties implemented by volumes that natively or partially support extended attributes.
-message XattrOperations {
-  // A Boolean value that instructs FSKit not to call this protocol's methods, even if the volume conforms to it.
-  //
-  // FSKit reads this value after the file system replies to the `loadResource` message.
-  // Changing the returned value during the runtime of the volume has no effect.
-  optional bool xattr_operations_inhibited = 1;
 }
 
 // List of extended attributes.

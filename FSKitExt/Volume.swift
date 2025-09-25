@@ -8,9 +8,9 @@ final class Volume: FSVolume {
     
     private let socket = Socket.shared
     
+    private var inhibitedOperations: Pb_InhibitedOperations!
     private var pathConfOperations: Pb_PathConfOperations!
     private var volumeCapabilities: Pb_VolumeCapabilities!
-    private var xattrOperations: Pb_XattrOperations!
     
     private var items: [UInt64: Item] = [:]
     
@@ -22,9 +22,22 @@ final class Volume: FSVolume {
     }
     
     func load() {
+        inhibitedOperations = getInhibitedOperations()
         pathConfOperations = getPathConfOperations()
         volumeCapabilities = getVolumeCapabilities()
-        xattrOperations = getXattrOperations()
+    }
+    
+    private func getInhibitedOperations() -> Pb_InhibitedOperations {
+        log.d("getInhibitedOperations")
+        do {
+            let response = try socket.send(content: .getInhibitedOperations(Pb_Request.GetInhibitedOperations()))
+            if case let .inhibitedOperations(value) = response {
+                return value
+            }
+        } catch {
+            log.e("getInhibitedOperations: failure (error = \(error.localizedDescription))")
+        }
+        return Pb_InhibitedOperations()
     }
     
     private func getPathConfOperations() -> Pb_PathConfOperations {
@@ -51,19 +64,6 @@ final class Volume: FSVolume {
             log.e("getVolumeCapabilities: failure (error = \(error.localizedDescription))")
         }
         return Pb_VolumeCapabilities()
-    }
-    
-    private func getXattrOperations() -> Pb_XattrOperations {
-        log.d("getXattrOperations")
-        do {
-            let response = try socket.send(content: .getXattrOperations(Pb_Request.GetXattrOperations()))
-            if case let .xattrOperations(value) = response {
-                return value
-            }
-        } catch {
-            log.e("getXattrOperations: failure (error = \(error.localizedDescription))")
-        }
-        return Pb_XattrOperations()
     }
 }
 
@@ -458,13 +458,7 @@ extension Volume: FSVolume.Operations {
 
 extension Volume: FSVolume.XattrOperations {
     var xattrOperationsInhibited: Bool {
-        get {
-            if xattrOperations.hasXattrOperationsInhibited {
-                xattrOperations.xattrOperationsInhibited
-            } else {
-                true
-            }
-        }
+        get { inhibitedOperations.xattrOperationsInhibited }
         set {}
     }
     
@@ -534,6 +528,11 @@ extension Volume: FSVolume.XattrOperations {
 }
 
 extension Volume: FSVolume.OpenCloseOperations {
+    var isOpenCloseInhibited: Bool {
+        get { inhibitedOperations.isOpenCloseInhibited }
+        set {}
+    }
+    
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
         log.d("openItem: \(item.name.string ?? "") (id = \(item.id))")
@@ -618,6 +617,42 @@ extension Volume: FSVolume.ReadWriteOperations {
         default:
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
+    }
+}
+
+extension Volume: FSVolume.AccessCheckOperations {
+    var isAccessCheckInhibited: Bool {
+        get { inhibitedOperations.isAccessCheckInhibited }
+        set {}
+    }
+    
+    func checkAccess(to theItem: FSItem, requestedAccess access: FSVolume.AccessMask) async throws -> Bool {
+        log.d("checkAccess")
+        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+    }
+}
+
+extension Volume: FSVolume.RenameOperations {
+    var isVolumeRenameInhibited: Bool {
+        get { inhibitedOperations.isVolumeRenameInhibited }
+        set {}
+    }
+    
+    func setVolumeName(_ name: FSFileName) async throws -> FSFileName {
+        log.d("setVolumeName")
+        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+    }
+}
+
+extension Volume: FSVolume.PreallocateOperations {
+    var isPreallocateInhibited: Bool {
+        get { inhibitedOperations.isPreallocateInhibited }
+        set {}
+    }
+    
+    func preallocateSpace(for item: FSItem, at offset: off_t, length: Int, flags: FSVolume.PreallocateFlags) async throws -> Int {
+        log.d("setVolumeName")
+        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
     }
 }
 
