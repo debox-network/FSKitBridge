@@ -315,6 +315,68 @@ message Request {
     int64 offset = 3;
   }
 
+  // Checks whether the file system allows access to the given item.
+  message CheckAccess {
+    // A bitmask of access rights.
+    enum AccessMask {
+      NONE = 0;
+
+      // The file system allows reading data.
+      READ_DATA = 1;
+
+      // The file system allows listing directory contents.
+      LIST_DIRECTORY = 2;
+
+      // The file system allows writing data.
+      WRITE_DATA = 4;
+
+      // The file system allows adding files.
+      ADD_FILE = 8;
+
+      // The file system allows file execution.
+      EXECUTE = 16;
+
+      // The file system allows searching files.
+      SEARCH = 32;
+
+      // The file system allows deleting a file.
+      DELETE = 64;
+
+      // The file system allows appending data to a file.
+      APPEND_DATA = 128;
+
+      // The file system allows adding subdirectories.
+      ADD_SUBDIRECTORY = 256;
+
+      // The file system allows deleting subdirectories.
+      DELETE_CHILD = 512;
+
+      // The file system allows reading file attributes.
+      READ_ATTRIBUTES = 1024;
+
+      // The file system allows writing file attributes.
+      WRITE_ATTRIBUTES = 2048;
+
+      // The file system allows reading extended file attributes.
+      READ_XATTR = 4096;
+
+      // The file system allows writing extended file attributes.
+      WRITE_XATTR = 8192;
+
+      // The file system allows reading a file's security descriptors.
+      READ_SECURITY = 16384;
+
+      // The file system allows writing a file's security descriptors.
+      WRITE_SECURITY = 32768;
+
+      // The file system allows taking ownership of a file.
+      TAKE_OWNERSHIP = 65536;
+    }
+
+    uint64 item_id = 1;
+    repeated AccessMask access = 2;
+  }
+
   uint64 id = 1;
   oneof content {
     GetResourceIdentifier get_resource_identifier = 2;
@@ -345,6 +407,7 @@ message Request {
     CloseItem close_item = 27;
     Read read = 28;
     Write write = 29;
+    CheckAccess check_access = 30;
   }
 }
 
@@ -371,8 +434,9 @@ message Response {
     Xattrs xattrs = 11;
     bytes data = 12;
     int64 byte_count = 13;
-    Success success = 14;
-    int32 posix_error = 15;
+    bool allow = 14;
+    Success success = 15;
+    int32 posix_error = 16;
   }
 }
 

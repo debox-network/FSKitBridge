@@ -1,67 +1,90 @@
-import Foundation
 import FSKit
+import Foundation
 import os
 
 final class Volume: FSVolume {
-    
+
     private let log = Logger(subsystem: "FSKitExt", category: "Volume")
-    
+
     private let socket = Socket.shared
-    
+
     private var inhibitedOperations: Pb_InhibitedOperations!
     private var pathConfOperations: Pb_PathConfOperations!
     private var volumeCapabilities: Pb_VolumeCapabilities!
-    
+
     private var items: [UInt64: Item] = [:]
-    
+
     init(_ identifier: Pb_VolumeIdentifier) {
         super.init(
-            volumeID: FSVolume.Identifier(uuid: UUID(uuidString: identifier.id) ?? UUID()),
-            volumeName: FSFileName(string: identifier.hasName ? identifier.name : Constants.volumeName)
+            volumeID: FSVolume.Identifier(
+                uuid: UUID(uuidString: identifier.id) ?? UUID()
+            ),
+            volumeName: FSFileName(
+                string: identifier.hasName
+                    ? identifier.name : Constants.volumeName
+            )
         )
     }
-    
+
     func load() {
         inhibitedOperations = getInhibitedOperations()
         pathConfOperations = getPathConfOperations()
         volumeCapabilities = getVolumeCapabilities()
     }
-    
+
     private func getInhibitedOperations() -> Pb_InhibitedOperations {
         log.d("getInhibitedOperations")
         do {
-            let response = try socket.send(content: .getInhibitedOperations(Pb_Request.GetInhibitedOperations()))
-            if case let .inhibitedOperations(value) = response {
+            let response = try socket.send(
+                content: .getInhibitedOperations(
+                    Pb_Request.GetInhibitedOperations()
+                )
+            )
+            if case .inhibitedOperations(let value) = response {
                 return value
             }
         } catch {
-            log.e("getInhibitedOperations: failure (error = \(error.localizedDescription))")
+            log.e(
+                "getInhibitedOperations: failure (error = \(error.localizedDescription))"
+            )
         }
         return Pb_InhibitedOperations()
     }
-    
+
     private func getPathConfOperations() -> Pb_PathConfOperations {
         log.d("getPathConfOperations")
         do {
-            let response = try socket.send(content: .getPathConfOperations(Pb_Request.GetPathConfOperations()))
-            if case let .pathConfOperations(value) = response {
+            let response = try socket.send(
+                content: .getPathConfOperations(
+                    Pb_Request.GetPathConfOperations()
+                )
+            )
+            if case .pathConfOperations(let value) = response {
                 return value
             }
         } catch {
-            log.e("getPathConfOperations: failure (error = \(error.localizedDescription))")
+            log.e(
+                "getPathConfOperations: failure (error = \(error.localizedDescription))"
+            )
         }
         return Pb_PathConfOperations()
     }
-    
+
     private func getVolumeCapabilities() -> Pb_VolumeCapabilities {
         log.d("getVolumeCapabilities")
         do {
-            let response = try socket.send(content: .getVolumeCapabilities(Pb_Request.GetVolumeCapabilities()))
-            if case let .volumeCapabilities(value) = response {
+            let response = try socket.send(
+                content: .getVolumeCapabilities(
+                    Pb_Request.GetVolumeCapabilities()
+                )
+            )
+            if case .volumeCapabilities(let value) = response {
                 return value
             }
         } catch {
-            log.e("getVolumeCapabilities: failure (error = \(error.localizedDescription))")
+            log.e(
+                "getVolumeCapabilities: failure (error = \(error.localizedDescription))"
+            )
         }
         return Pb_VolumeCapabilities()
     }
@@ -71,19 +94,19 @@ extension Volume: FSVolume.PathConfOperations {
     var maximumLinkCount: Int {
         Int(pathConfOperations.maximumLinkCount)
     }
-    
+
     var maximumNameLength: Int {
         Int(pathConfOperations.maximumNameLength)
     }
-    
+
     var restrictsOwnershipChanges: Bool {
         pathConfOperations.restrictsOwnershipChanges
     }
-    
+
     var truncatesLongNames: Bool {
         pathConfOperations.truncatesLongNames
     }
-    
+
     var maximumXattrSize: Int {
         if pathConfOperations.hasMaximumXattrSize {
             Int(pathConfOperations.maximumXattrSize)
@@ -91,7 +114,7 @@ extension Volume: FSVolume.PathConfOperations {
             Int.max
         }
     }
-    
+
     var maximumXattrSizeInBits: Int {
         if pathConfOperations.hasMaximumXattrSizeInBits {
             Int(pathConfOperations.maximumXattrSizeInBits)
@@ -99,7 +122,7 @@ extension Volume: FSVolume.PathConfOperations {
             Int.max
         }
     }
-    
+
     var maximumFileSize: UInt64 {
         if pathConfOperations.hasMaximumFileSize {
             pathConfOperations.maximumFileSize
@@ -107,7 +130,7 @@ extension Volume: FSVolume.PathConfOperations {
             UInt64.max
         }
     }
-    
+
     var maximumFileSizeInBits: Int {
         if pathConfOperations.hasMaximumFileSizeInBits {
             Int(pathConfOperations.maximumFileSizeInBits)
@@ -121,26 +144,30 @@ extension Volume: FSVolume.Operations {
     var supportedVolumeCapabilities: FSVolume.SupportedCapabilities {
         FSVolume.SupportedCapabilities(volumeCapabilities)
     }
-    
+
     var volumeStatistics: FSStatFSResult {
         log.d("getVolumeStatistics")
         do {
-            let response = try socket.send(content: .getVolumeStatistics(Pb_Request.GetVolumeStatistics()))
-            if case let .statFsResult(value) = response {
+            let response = try socket.send(
+                content: .getVolumeStatistics(Pb_Request.GetVolumeStatistics())
+            )
+            if case .statFsResult(let value) = response {
                 return FSStatFSResult(value)
             }
         } catch {
-            log.e("getVolumeStatistics: failure (error = \(error.localizedDescription))")
+            log.e(
+                "getVolumeStatistics: failure (error = \(error.localizedDescription))"
+            )
         }
         return FSStatFSResult(fileSystemTypeName: Constants.volumeName)
     }
-    
+
     func mount(options: FSTaskOptions) async throws {
         log.d("mount")
-        
+
         var request = Pb_Request.Mount()
         request.options = options.toProto()
-        
+
         switch try socket.send(content: .mount(request)) {
         case .success(_):
             return
@@ -151,7 +178,7 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func unmount() async {
         log.d("unmount")
         switch try? socket.send(content: .unmount(Pb_Request.Unmount())) {
@@ -163,13 +190,13 @@ extension Volume: FSVolume.Operations {
             log.e("unmount: failure")
         }
     }
-    
+
     func synchronize(flags: FSSyncFlags) async throws {
         log.d("synchronize")
-        
+
         var request = Pb_Request.Synchronize()
         request.flags = UInt32(flags.rawValue)
-        
+
         switch try socket.send(content: .synchronize(request)) {
         case .success(_):
             return
@@ -180,16 +207,19 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func attributes(_ desiredAttributes: FSItem.GetAttributesRequest, of item: FSItem) async throws -> FSItem.Attributes {
+
+    func attributes(
+        _ desiredAttributes: FSItem.GetAttributesRequest,
+        of item: FSItem
+    ) async throws -> FSItem.Attributes {
         guard let item = item as? Item else {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         log.d("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.GetAttributes()
         request.itemID = item.id
-        
+
         switch try socket.send(content: .getAttributes(request)) {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
@@ -201,15 +231,18 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func setAttributes(_ newAttributes: FSItem.SetAttributesRequest, on item: FSItem) async throws -> FSItem.Attributes {
+
+    func setAttributes(
+        _ newAttributes: FSItem.SetAttributesRequest,
+        on item: FSItem
+    ) async throws -> FSItem.Attributes {
         let item = item as! Item
         log.d("setAttributes: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.SetAttributes()
         request.attributes = newAttributes.toProto()
         request.itemID = item.id
-        
+
         switch try socket.send(content: .setAttributes(request)) {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
@@ -221,15 +254,19 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func lookupItem(named name: FSFileName, inDirectory directory: FSItem) async throws -> (FSItem, FSFileName) {
+
+    func lookupItem(named name: FSFileName, inDirectory directory: FSItem)
+        async throws -> (FSItem, FSFileName)
+    {
         let directory = directory as! Item
-        log.d("lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
-        
+        log.d(
+            "lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.LookupItem()
         request.name = name.data
         request.directoryID = directory.id
-        
+
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
             if let item_ = items[item.attributes.fileID] {
@@ -248,14 +285,14 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func reclaimItem(_ item: FSItem) async throws {
         let item = item as! Item
         log.d("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.ReclaimItem()
         request.itemID = item.id
-        
+
         switch try socket.send(content: .reclaimItem(request)) {
         case .success(_):
             items.removeValue(forKey: item.id)
@@ -267,14 +304,14 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func readSymbolicLink(_ item: FSItem) async throws -> FSFileName {
         let item = item as! Item
         log.d("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.ReadSymbolicLink()
         request.itemID = item.id
-        
+
         switch try socket.send(content: .readSymbolicLink(request)) {
         case .data(let data):
             return FSFileName(data: data)
@@ -285,17 +322,24 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func createItem(named name: FSFileName, type: FSItem.ItemType, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest) async throws -> (FSItem, FSFileName) {
+
+    func createItem(
+        named name: FSFileName,
+        type: FSItem.ItemType,
+        inDirectory directory: FSItem,
+        attributes newAttributes: FSItem.SetAttributesRequest
+    ) async throws -> (FSItem, FSFileName) {
         let directory = directory as! Item
-        log.d("createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
-        
+        log.d(
+            "createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.CreateItem()
         request.name = name.data
         request.type = Pb_ItemType(rawValue: type.rawValue)!
         request.directoryID = directory.id
         request.attributes = newAttributes.toProto()
-        
+
         switch try socket.send(content: .createItem(request)) {
         case .item(let item):
             let item = Item(item)
@@ -308,17 +352,24 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func createSymbolicLink(named name: FSFileName, inDirectory directory: FSItem, attributes newAttributes: FSItem.SetAttributesRequest, linkContents contents: FSFileName) async throws -> (FSItem, FSFileName) {
+
+    func createSymbolicLink(
+        named name: FSFileName,
+        inDirectory directory: FSItem,
+        attributes newAttributes: FSItem.SetAttributesRequest,
+        linkContents contents: FSFileName
+    ) async throws -> (FSItem, FSFileName) {
         let directory = directory as! Item
-        log.d("createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")")
-        
+        log.d(
+            "createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.CreateSymbolicLink()
         request.name = name.data
         request.directoryID = directory.id
         request.newAttributes = newAttributes.toProto()
         request.contents = contents.data
-        
+
         switch try socket.send(content: .createSymbolicLink(request)) {
         case .item(let item):
             let item = Item(item)
@@ -331,7 +382,7 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func createLink(
         to item: FSItem,
         named name: FSFileName,
@@ -340,17 +391,21 @@ extension Volume: FSVolume.Operations {
         log.d("createLink: \(name)")
         throw fs_errorForPOSIXError(POSIXError.EIO.rawValue)
     }
-    
-    func removeItem(_ item: FSItem, named name: FSFileName, fromDirectory directory: FSItem) async throws {
+
+    func removeItem(
+        _ item: FSItem,
+        named name: FSFileName,
+        fromDirectory directory: FSItem
+    ) async throws {
         let item = item as! Item
         let directory = directory as! Item
         log.d("removeItem: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.RemoveItem()
         request.itemID = item.id
         request.name = name.data
         request.directoryID = directory.id
-        
+
         switch try socket.send(content: .removeItem(request)) {
         case .success(_):
             return
@@ -361,14 +416,23 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func renameItem(_ item: FSItem, inDirectory sourceDirectory: FSItem, named sourceName: FSFileName, to destinationName: FSFileName, inDirectory destinationDirectory: FSItem, overItem: FSItem?) async throws -> FSFileName {
+
+    func renameItem(
+        _ item: FSItem,
+        inDirectory sourceDirectory: FSItem,
+        named sourceName: FSFileName,
+        to destinationName: FSFileName,
+        inDirectory destinationDirectory: FSItem,
+        overItem: FSItem?
+    ) async throws -> FSFileName {
         let item = item as! Item
         let sourceDirectory = sourceDirectory as! Item
         let destinationDirectory = destinationDirectory as! Item
         let overItem = overItem as? Item
-        log.d("renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))")
-        
+        log.d(
+            "renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))"
+        )
+
         var request = Pb_Request.RenameItem()
         request.itemID = item.id
         request.sourceDirectoryID = sourceDirectory.id
@@ -378,7 +442,7 @@ extension Volume: FSVolume.Operations {
         if overItem != nil {
             request.overItemID = overItem!.id
         }
-        
+
         switch try socket.send(content: .renameItem(request)) {
         case .data(let data):
             item.updateName(name: data)
@@ -390,16 +454,24 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func enumerateDirectory(_ directory: FSItem, startingAt cookie: FSDirectoryCookie, verifier: FSDirectoryVerifier, attributes: FSItem.GetAttributesRequest?, packer: FSDirectoryEntryPacker) async throws -> FSDirectoryVerifier {
+
+    func enumerateDirectory(
+        _ directory: FSItem,
+        startingAt cookie: FSDirectoryCookie,
+        verifier: FSDirectoryVerifier,
+        attributes: FSItem.GetAttributesRequest?,
+        packer: FSDirectoryEntryPacker
+    ) async throws -> FSDirectoryVerifier {
         let directory = directory as! Item
-        log.d("enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))")
-        
+        log.d(
+            "enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))"
+        )
+
         var request = Pb_Request.EnumerateDirectory()
         request.directoryID = directory.id
         request.cookie = cookie.rawValue
         request.verifier = verifier.rawValue
-        
+
         switch try socket.send(content: .enumerateDirectory(request)) {
         case .directoryEntries(let entries):
             for entry in entries.entries {
@@ -422,13 +494,13 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func activate(options: FSTaskOptions) async throws -> FSItem {
         log.d("activate")
-        
+
         var request = Pb_Request.Activate()
         request.options = options.toProto()
-        
+
         switch try socket.send(content: .activate(request)) {
         case .item(let item):
             let item = Item(item)
@@ -441,7 +513,7 @@ extension Volume: FSVolume.Operations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func deactivate(options: FSDeactivateOptions = []) async throws {
         log.d("deactivate")
         switch try socket.send(content: .deactivate(Pb_Request.Deactivate())) {
@@ -461,15 +533,17 @@ extension Volume: FSVolume.XattrOperations {
         get { inhibitedOperations.xattrOperationsInhibited }
         set {}
     }
-    
+
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
         let item = item as! Item
-        log.d("getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
-        
+        log.d(
+            "getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.GetXattr()
         request.name = name.data
         request.itemID = item.id
-        
+
         switch try socket.send(content: .getXattr(request)) {
         case .data(let data):
             return data
@@ -480,11 +554,18 @@ extension Volume: FSVolume.XattrOperations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func setXattr(named name: FSFileName, to value: Data?, on item: FSItem, policy: FSVolume.SetXattrPolicy) async throws {
+
+    func setXattr(
+        named name: FSFileName,
+        to value: Data?,
+        on item: FSItem,
+        policy: FSVolume.SetXattrPolicy
+    ) async throws {
         let item = item as! Item
-        log.d("setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
-        
+        log.d(
+            "setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.SetXattr()
         request.name = name.data
         if value != nil {
@@ -492,7 +573,7 @@ extension Volume: FSVolume.XattrOperations {
         }
         request.itemID = item.id
         request.policy = Pb_SetXattrPolicy(rawValue: Int(policy.rawValue))!
-        
+
         switch try socket.send(content: .setXattr(request)) {
         case .success(_):
             return
@@ -503,14 +584,16 @@ extension Volume: FSVolume.XattrOperations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
         let item = item as! Item
-        log.d("getXattrs: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")")
-        
+        log.d(
+            "getXattrs: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")"
+        )
+
         var request = Pb_Request.GetXattrs()
         request.itemID = item.id
-        
+
         switch try socket.send(content: .getXattrs(request)) {
         case .xattrs(let xattrs):
             var names: [FSFileName] = []
@@ -532,15 +615,15 @@ extension Volume: FSVolume.OpenCloseOperations {
         get { inhibitedOperations.isOpenCloseInhibited }
         set {}
     }
-    
+
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
         log.d("openItem: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.OpenItem()
         request.itemID = item.id
         request.modes = modes.toProto()
-        
+
         switch try socket.send(content: .openItem(request)) {
         case .success(_):
             return
@@ -551,15 +634,15 @@ extension Volume: FSVolume.OpenCloseOperations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
+
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
         let item = item as! Item
         log.d("closeItem: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.CloseItem()
         request.itemID = item.id
         request.modes = modes.toProto()
-        
+
         switch try socket.send(content: .closeItem(request)) {
         case .success(_):
             return
@@ -573,15 +656,20 @@ extension Volume: FSVolume.OpenCloseOperations {
 }
 
 extension Volume: FSVolume.ReadWriteOperations {
-    func read(from item: FSItem, at offset: off_t, length: Int, into buffer: FSMutableFileDataBuffer) async throws -> Int {
+    func read(
+        from item: FSItem,
+        at offset: off_t,
+        length: Int,
+        into buffer: FSMutableFileDataBuffer
+    ) async throws -> Int {
         let item = item as! Item
         log.d("read: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.Read()
         request.itemID = item.id
         request.offset = offset
         request.length = Int64(length)
-        
+
         switch try socket.send(content: .read(request)) {
         case .data(let data):
             return data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
@@ -598,16 +686,18 @@ extension Volume: FSVolume.ReadWriteOperations {
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
     }
-    
-    func write(contents: Data, to item: FSItem, at offset: off_t) async throws -> Int {
+
+    func write(contents: Data, to item: FSItem, at offset: off_t) async throws
+        -> Int
+    {
         let item = item as! Item
         log.d("write: \(item.name.string ?? "") (id = \(item.id))")
-        
+
         var request = Pb_Request.Write()
         request.contents = contents
         request.itemID = item.id
         request.offset = offset
-        
+
         switch try socket.send(content: .write(request)) {
         case .byteCount(let count):
             return Int(count)
@@ -625,10 +715,27 @@ extension Volume: FSVolume.AccessCheckOperations {
         get { inhibitedOperations.isAccessCheckInhibited }
         set {}
     }
-    
-    func checkAccess(to theItem: FSItem, requestedAccess access: FSVolume.AccessMask) async throws -> Bool {
-        log.d("checkAccess")
-        throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+
+    func checkAccess(
+        to theItem: FSItem,
+        requestedAccess access: FSVolume.AccessMask
+    ) async throws -> Bool {
+        let item = theItem as! Item
+        log.d("checkAccess: \(item.name.string ?? "") (id = \(item.id))")
+
+        var request = Pb_Request.CheckAccess()
+        request.itemID = item.id
+        request.access = access.toProto()
+
+        switch try socket.send(content: .checkAccess(request)) {
+        case .allow(let allow):
+            return allow
+        case .posixError(let code):
+            log.posixError("checkAccess", code)
+            throw fs_errorForPOSIXError(code)
+        default:
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
     }
 }
 
@@ -637,7 +744,7 @@ extension Volume: FSVolume.RenameOperations {
         get { inhibitedOperations.isVolumeRenameInhibited }
         set {}
     }
-    
+
     func setVolumeName(_ name: FSFileName) async throws -> FSFileName {
         log.d("setVolumeName")
         throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
@@ -649,8 +756,13 @@ extension Volume: FSVolume.PreallocateOperations {
         get { inhibitedOperations.isPreallocateInhibited }
         set {}
     }
-    
-    func preallocateSpace(for item: FSItem, at offset: off_t, length: Int, flags: FSVolume.PreallocateFlags) async throws -> Int {
+
+    func preallocateSpace(
+        for item: FSItem,
+        at offset: off_t,
+        length: Int,
+        flags: FSVolume.PreallocateFlags
+    ) async throws -> Int {
         log.d("setVolumeName")
         throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
     }
@@ -660,7 +772,8 @@ extension FSVolume.SupportedCapabilities {
     convenience init(_ capabilities: Pb_VolumeCapabilities) {
         self.init()
         if capabilities.hasSupportsPersistentObjectIds {
-            self.supportsPersistentObjectIDs = capabilities.supportsPersistentObjectIds
+            self.supportsPersistentObjectIDs =
+                capabilities.supportsPersistentObjectIds
         }
         if capabilities.hasSupportsSymbolicLinks {
             self.supportsSymbolicLinks = capabilities.supportsSymbolicLinks
@@ -696,7 +809,8 @@ extension FSVolume.SupportedCapabilities {
             self.supportsHiddenFiles = capabilities.supportsHiddenFiles
         }
         if capabilities.hasDoesNotSupportVolumeSizes {
-            self.doesNotSupportVolumeSizes = capabilities.doesNotSupportVolumeSizes
+            self.doesNotSupportVolumeSizes =
+                capabilities.doesNotSupportVolumeSizes
         }
         if capabilities.hasSupports64BitObjectIds {
             self.supports64BitObjectIDs = capabilities.supports64BitObjectIds
@@ -705,10 +819,12 @@ extension FSVolume.SupportedCapabilities {
             self.supportsDocumentID = capabilities.supportsDocumentID
         }
         if capabilities.hasDoesNotSupportImmutableFiles {
-            self.doesNotSupportImmutableFiles = capabilities.doesNotSupportImmutableFiles
+            self.doesNotSupportImmutableFiles =
+                capabilities.doesNotSupportImmutableFiles
         }
         if capabilities.hasDoesNotSupportSettingFilePermissions {
-            self.doesNotSupportSettingFilePermissions = capabilities.doesNotSupportSettingFilePermissions
+            self.doesNotSupportSettingFilePermissions =
+                capabilities.doesNotSupportSettingFilePermissions
         }
         if capabilities.hasSupportsSharedSpace {
             self.supportsSharedSpace = capabilities.supportsSharedSpace
@@ -717,7 +833,9 @@ extension FSVolume.SupportedCapabilities {
             self.supportsVolumeGroups = capabilities.supportsVolumeGroups
         }
         if capabilities.hasCaseFormat {
-            self.caseFormat = FSVolume.CaseFormat(rawValue: capabilities.caseFormat.rawValue)!
+            self.caseFormat = FSVolume.CaseFormat(
+                rawValue: capabilities.caseFormat.rawValue
+            )!
         }
     }
 }
@@ -751,9 +869,33 @@ extension FSTaskOptions {
 
 extension FSVolume.OpenModes {
     func toProto() -> [Pb_OpenMode] {
-        var modes: [Pb_OpenMode] = []
-        if self.rawValue & UInt(Pb_OpenMode.read.rawValue) != 0 { modes.append(.read) }
-        if self.rawValue & UInt(Pb_OpenMode.write.rawValue) != 0 { modes.append(.write) }
-        return modes
+        var out: [Pb_OpenMode] = []
+        if self.contains(.read) { out.append(.read) }
+        if self.contains(.write) { out.append(.write) }
+        return out.isEmpty ? [.none] : out
+    }
+}
+
+extension FSVolume.AccessMask {
+    func toProto() -> [Pb_Request.CheckAccess.AccessMask] {
+        var out: [Pb_Request.CheckAccess.AccessMask] = []
+        if self.contains(.readData) { out.append(.readData) }
+        if self.contains(.listDirectory) { out.append(.listDirectory) }
+        if self.contains(.writeData) { out.append(.writeData) }
+        if self.contains(.addFile) { out.append(.addFile) }
+        if self.contains(.execute) { out.append(.execute) }
+        if self.contains(.search) { out.append(.search) }
+        if self.contains(.delete) { out.append(.delete) }
+        if self.contains(.appendData) { out.append(.appendData) }
+        if self.contains(.addSubdirectory) { out.append(.addSubdirectory) }
+        if self.contains(.deleteChild) { out.append(.deleteChild) }
+        if self.contains(.readAttributes) { out.append(.readAttributes) }
+        if self.contains(.writeAttributes) { out.append(.writeAttributes) }
+        if self.contains(.readXattr) { out.append(.readXattr) }
+        if self.contains(.writeXattr) { out.append(.writeXattr) }
+        if self.contains(.readSecurity) { out.append(.readSecurity) }
+        if self.contains(.writeSecurity) { out.append(.writeSecurity) }
+        if self.contains(.takeOwnership) { out.append(.takeOwnership) }
+        return out.isEmpty ? [.none] : out
     }
 }
