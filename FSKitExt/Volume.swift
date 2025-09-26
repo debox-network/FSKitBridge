@@ -195,7 +195,9 @@ extension Volume: FSVolume.Operations {
         log.d("synchronize")
 
         var request = Pb_Request.Synchronize()
-        request.flags = UInt32(flags.rawValue)
+        request.flags = Pb_Request.Synchronize.SyncFlags(
+            rawValue: flags.rawValue
+        )!
 
         switch try socket.send(content: .synchronize(request)) {
         case .success(_):

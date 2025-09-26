@@ -61,14 +61,21 @@ message Request {
   message Synchronize {
     // Behavior flags for use with synchronization calls.
     //
-    // These values are based on flags defined in `mount.h`. Since there are system-defined flags that are valid
-    // in the kernel but not in FSKit, this type defines its members as options rather than use an enumeration.
-    //
-    // - Values:
-    //   - wait = 1: A flag for synchronized I/O with file-integrity completion.
-    //   - noWait = 2: A flag for synchronized I/O that starts I/O but doesn't wait for it.
-    //   - dWait = 4: A flag for synchronized I/O with data-integrity completion.
-    uint32 flags = 1;
+    // These values are based on flags defined in `mount.h`. Since there are system-defined flags that are valid in the kernel but not in FSKit, this type defines its members as options rather than use an enumeration.
+    enum SyncFlags {
+      NONE = 0;
+
+      /// A flag for synchronized I/O with file-integrity completion.
+      WAIT = 1;
+
+      /// A flag for synchronized I/O that starts I/O but doesn't wait for it.
+      NO_WAIT = 2;
+
+      /// A flag for synchronized I/O with data-integrity completion.
+      D_WAIT = 4;
+    }
+
+    SyncFlags flags = 1;
   }
 
   // Fetches attributes for the given item.
