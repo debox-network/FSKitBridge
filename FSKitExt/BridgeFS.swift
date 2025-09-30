@@ -16,7 +16,7 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     func probeResource(resource: FSResource, replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void) {
         log.d("probeResource")
         do {
-            let response = try socket.send(content: .getResourceIdentifier(Pb_Request.GetResourceIdentifier()))
+            let response = try socket.send(content: .getResourceIdentifier(Pb_GetResourceIdentifier()))
             if case let .resourceIdentifier(value) = response {
                 replyHandler(FSProbeResult.usable(name: value.name, containerID: FSContainerIdentifier(uuid: UUID(uuidString: value.containerID) ?? UUID())), nil)
                 return
@@ -30,7 +30,7 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
     func loadResource(resource: FSResource, options: FSTaskOptions, replyHandler: @escaping (FSVolume?, (any Error)?) -> Void) {
         log.d("loadResource")
         do {
-            let response = try socket.send(content: .getVolumeIdentifier(Pb_Request.GetVolumeIdentifier()))
+            let response = try socket.send(content: .getVolumeIdentifier(Pb_GetVolumeIdentifier()))
             if case let .volumeIdentifier(value) = response {
                 let volume = Volume(value)
                 volume.load()
