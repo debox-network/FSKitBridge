@@ -21,7 +21,7 @@ final class Volume: FSVolume {
             ),
             volumeName: FSFileName(
                 string: identifier.hasName
-                    ? identifier.name : Constants.volumeName
+                    ? identifier.name : Bundle.main.fsShortName!
             )
         )
     }
@@ -34,53 +34,38 @@ final class Volume: FSVolume {
 
     private func getVolumeBehavior() -> Pb_VolumeBehavior {
         log.d("getInhibitedOperations")
-        do {
-            let response = try socket.send(
-                content: .getVolumeBehavior(Pb_GetVolumeBehavior())
-            )
-            if case .volumeBehavior(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getInhibitedOperations: failure (error = \(error.localizedDescription))"
-            )
+        let response = try? socket.send(
+            content: .getVolumeBehavior(Pb_GetVolumeBehavior())
+        )
+        return if case .volumeBehavior(let value) = response {
+            value
+        } else {
+            Pb_VolumeBehavior()
         }
-        return Pb_VolumeBehavior()
     }
 
     private func getPathConfOperations() -> Pb_PathConfOperations {
         log.d("getPathConfOperations")
-        do {
-            let response = try socket.send(
-                content: .getPathConfOperations(Pb_GetPathConfOperations())
-            )
-            if case .pathConfOperations(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getPathConfOperations: failure (error = \(error.localizedDescription))"
-            )
+        let response = try? socket.send(
+            content: .getPathConfOperations(Pb_GetPathConfOperations())
+        )
+        return if case .pathConfOperations(let value) = response {
+            value
+        } else {
+            Pb_PathConfOperations()
         }
-        return Pb_PathConfOperations()
     }
 
     private func getVolumeCapabilities() -> Pb_SupportedCapabilities {
         log.d("getVolumeCapabilities")
-        do {
-            let response = try socket.send(
-                content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
-            )
-            if case .supportedCapabilities(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getVolumeCapabilities: failure (error = \(error.localizedDescription))"
-            )
+        let response = try? socket.send(
+            content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
+        )
+        return if case .supportedCapabilities(let value) = response {
+            value
+        } else {
+            Pb_SupportedCapabilities()
         }
-        return Pb_SupportedCapabilities()
     }
 }
 
@@ -141,19 +126,14 @@ extension Volume: FSVolume.Operations {
 
     var volumeStatistics: FSStatFSResult {
         log.d("getVolumeStatistics")
-        do {
-            let response = try socket.send(
-                content: .getVolumeStatistics(Pb_GetVolumeStatistics())
-            )
-            if case .statFsResult(let value) = response {
-                return FSStatFSResult(value)
-            }
-        } catch {
-            log.e(
-                "getVolumeStatistics: failure (error = \(error.localizedDescription))"
-            )
+        let response = try? socket.send(
+            content: .getVolumeStatistics(Pb_GetVolumeStatistics())
+        )
+        return if case .statFsResult(let value) = response {
+            FSStatFSResult(value)
+        } else {
+            FSStatFSResult(fileSystemTypeName: Bundle.main.fsShortName!)
         }
-        return FSStatFSResult(fileSystemTypeName: Constants.volumeName)
     }
 
     func mount(options: FSTaskOptions) async throws {
