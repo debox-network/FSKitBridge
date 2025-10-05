@@ -995,25 +995,3 @@ extension FSVolume.PreallocateFlags {
         return out
     }
 }
-
-extension Bundle {
-    var fsShortName: String? {
-        guard
-            let attrs = infoDictionary?["EXAppExtensionAttributes"]
-                as? [String: Any],
-            let value = attrs["FSShortName"] as? String
-        else { return nil }
-        return value
-    }
-
-    var fsSubType: Int? {
-        guard
-            let attrs = infoDictionary?["EXAppExtensionAttributes"]
-                as? [String: Any],
-            let pers = attrs["FSPersonalities"]
-                as? [String: Any],
-            let value = pers["FSSubType"] as? Int
-        else { return nil }
-        return value
-    }
-}

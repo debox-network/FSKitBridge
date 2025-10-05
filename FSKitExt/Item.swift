@@ -1,23 +1,23 @@
-import Foundation
 import FSKit
+import Foundation
 import SwiftProtobuf
 
 final class Item: FSItem {
-    
+
     private(set) var name: FSFileName
     private(set) var attributes: FSItem.Attributes
-    
+
     var id: UInt64 { attributes.fileID.rawValue }
-    
+
     init(_ item: Pb_Item) {
         self.name = FSFileName(data: item.name)
         self.attributes = FSItem.Attributes(item.attributes)
     }
-    
+
     func updateName(name: Data) {
         self.name = FSFileName(data: name)
     }
-    
+
     func updateAttributes(attributes: Pb_ItemAttributes) {
         self.attributes = FSItem.Attributes(attributes)
     }
@@ -81,13 +81,13 @@ extension FSItem.Attributes {
             self.backupTime = timespec(attributes.backupTime)
         }
     }
-    
+
     func toProto() -> Pb_ItemAttributes {
         var attributes = Pb_ItemAttributes()
         if self.isValid(.uid) {
             attributes.uid = self.uid
         }
-        if self.isValid(.gid)  {
+        if self.isValid(.gid) {
             attributes.gid = self.gid
         }
         if self.isValid(.mode) {
@@ -149,7 +149,7 @@ extension timespec {
             tv_nsec: Int(ts.nanos)
         )
     }
-    
+
     func toProto() -> Google_Protobuf_Timestamp {
         var ts = Google_Protobuf_Timestamp()
         ts.seconds = Int64(self.tv_sec)
