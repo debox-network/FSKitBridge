@@ -4,7 +4,7 @@ import Foundation
 @main
 struct FSKitExt: UnaryFileSystemExtension {
     var fileSystem: FSUnaryFileSystem & FSUnaryFileSystemOperations {
-        BridgeFS()
+        BridgeFS.shared
     }
 }
 

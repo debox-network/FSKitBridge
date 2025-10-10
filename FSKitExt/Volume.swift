@@ -33,7 +33,7 @@ final class Volume: FSVolume {
     }
 
     private func getVolumeBehavior() -> Pb_VolumeBehavior {
-        log.d("getInhibitedOperations")
+        log.d("getVolumeBehavior")
         let response = try? socket.send(
             content: .getVolumeBehavior(Pb_GetVolumeBehavior())
         )

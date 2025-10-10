@@ -4,11 +4,13 @@ import os
 
 final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
 
+    static let shared = BridgeFS()
+
     private let log = Logger(subsystem: "FSKitExt", category: "BridgeFS")
 
     private let socket = Socket.shared
 
-    override init() {
+    private override init() {
         super.init()
         Socket.shared.initialize(
             host: "localhost",
