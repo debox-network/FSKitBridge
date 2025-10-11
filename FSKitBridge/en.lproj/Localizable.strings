@@ -1,0 +1,4 @@
+"setup_title" = "Setup Confirmation";
+"setup_message" = "The FSKit extension has been successfully registered and activated.";
+"footer_powered" = "powered by Debox";
+"button_done" = "Done";
