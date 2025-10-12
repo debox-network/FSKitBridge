@@ -12,6 +12,28 @@
 		76A2B12F2E2857B200BCA3F9 /* FSKitExt.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = 76A2B1252E2857B200BCA3F9 /* FSKitExt.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXBuildRule section */
+		76AA5CF32E9B46960040DF4A /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			fileType = sourcecode.protobuf;
+			outputFiles = (
+				"$(DERIVED_SOURCES_DIR)/GeneratedProtos/$(INPUT_FILE_BASE).pb.swift",
+			);
+			script = (
+				"set -euo pipefail",
+				"",
+				"PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\" ",
+				"",
+				"OUT_DIR=\"${DERIVED_SOURCES_DIR}/GeneratedProtos\"",
+				"mkdir -p \"$OUT_DIR\"",
+				"",
+				"protoc --proto_path=\"${SRCROOT}/FSKitExt\" --swift_out=\"$OUT_DIR\" \"$INPUT_FILE_PATH\"",
+				"",
+			);
+		};
+/* End PBXBuildRule section */
+
 /* Begin PBXContainerItemProxy section */
 		76A2B12D2E2857B200BCA3F9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -151,6 +173,7 @@
 				76A2B1232E2857B200BCA3F9 /* Resources */,
 			);
 			buildRules = (
+				76AA5CF32E9B46960040DF4A /* PBXBuildRule */,
 			);
 			fileSystemSynchronizedGroups = (
 				76A2B1262E2857B200BCA3F9 /* FSKitExt */,
