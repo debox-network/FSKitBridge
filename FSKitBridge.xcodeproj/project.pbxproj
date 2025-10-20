@@ -20,6 +20,7 @@
 			outputFiles = (
 				"$(DERIVED_SOURCES_DIR)/GeneratedProtos/$(INPUT_FILE_BASE).pb.swift",
 			);
+			runOncePerArchitecture = 0;
 			script = (
 				"set -euo pipefail",
 				"",
