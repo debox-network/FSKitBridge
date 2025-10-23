@@ -12,10 +12,12 @@ final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
 
     private override init() {
         super.init()
-        Socket.shared.initialize(
-            host: "localhost",
-            port: Bundle.main.serverPort!
-        )
+        do {
+            let port = try Bundle.main.getServerPort()
+            socket.initialize(host: "localhost", port: port)
+        } catch {
+            log.e("Failed to configure socket: \(error.localizedDescription)")
+        }
     }
 
     func probeResource(

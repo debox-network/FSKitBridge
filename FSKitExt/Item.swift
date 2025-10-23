@@ -94,7 +94,7 @@ extension FSItem.Attributes {
             attributes.mode = self.mode
         }
         if self.isValid(.type) {
-            attributes.type = Pb_ItemType(rawValue: self.type.rawValue)!
+            attributes.type = self.type.toProto()
         }
         if self.isValid(.linkCount) {
             attributes.linkCount = self.linkCount
@@ -139,6 +139,12 @@ extension FSItem.Attributes {
             attributes.backupTime = self.backupTime.toProto()
         }
         return attributes
+    }
+}
+
+extension FSItem.ItemType {
+    func toProto() -> Pb_ItemType {
+        return Pb_ItemType(rawValue: self.rawValue)!
     }
 }
 

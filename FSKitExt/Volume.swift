@@ -15,14 +15,18 @@ final class Volume: FSVolume {
     private var items: [UInt64: Item] = [:]
 
     init(_ identifier: Pb_VolumeIdentifier) {
+        let volumeName: String
+        if identifier.hasName && !identifier.name.isEmpty {
+            volumeName = identifier.name
+        } else {
+            volumeName = Bundle.main.resolvedShortName
+        }
+
         super.init(
             volumeID: FSVolume.Identifier(
                 uuid: UUID(uuidString: identifier.id) ?? UUID()
             ),
-            volumeName: FSFileName(
-                string: identifier.hasName
-                    ? identifier.name : Bundle.main.fsShortName!
-            )
+            volumeName: FSFileName(string: volumeName)
         )
     }
 
@@ -66,6 +70,26 @@ final class Volume: FSVolume {
         } else {
             Pb_SupportedCapabilities()
         }
+    }
+
+    private func ensureItem(_ fsItem: FSItem, fn: StaticString = #function)
+        throws -> Item
+    {
+        guard let item = fsItem as? Item else {
+            log.e("\(fn): unexpected FSItem type \(type(of: fsItem))")
+            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
+        }
+        return item
+    }
+
+    private func optionalItem(_ fsItem: FSItem, fn: StaticString = #function)
+        -> Item?
+    {
+        guard let item = fsItem as? Item else {
+            log.e("\(fn): unexpected FSItem type \(type(of: fsItem))")
+            return nil
+        }
+        return item
     }
 }
 
@@ -132,7 +156,7 @@ extension Volume: FSVolume.Operations {
         return if case .statFsResult(let value) = response {
             FSStatFSResult(value)
         } else {
-            FSStatFSResult(fileSystemTypeName: Bundle.main.fsShortName!)
+            FSStatFSResult(fileSystemTypeName: Bundle.main.resolvedShortName)
         }
     }
 
@@ -169,7 +193,7 @@ extension Volume: FSVolume.Operations {
         log.d("synchronize")
 
         var request = Pb_Synchronize()
-        request.flags = Pb_Synchronize.SyncFlags(rawValue: flags.rawValue)!
+        request.flags = flags.toProto()
 
         switch try socket.send(content: .synchronize(request)) {
         case .success(_):
@@ -186,9 +210,7 @@ extension Volume: FSVolume.Operations {
         _ desiredAttributes: FSItem.GetAttributesRequest,
         of item: FSItem
     ) async throws -> FSItem.Attributes {
-        guard let item = item as? Item else {
-            throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
-        }
+        let item = try ensureItem(item)
         log.d("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_GetAttributes()
@@ -210,7 +232,7 @@ extension Volume: FSVolume.Operations {
         _ newAttributes: FSItem.SetAttributesRequest,
         on item: FSItem
     ) async throws -> FSItem.Attributes {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("setAttributes: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_SetAttributes()
@@ -232,7 +254,7 @@ extension Volume: FSVolume.Operations {
     func lookupItem(named name: FSFileName, inDirectory directory: FSItem)
         async throws -> (FSItem, FSFileName)
     {
-        let directory = directory as! Item
+        let directory = try ensureItem(directory)
         log.d(
             "lookupItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
         )
@@ -261,7 +283,7 @@ extension Volume: FSVolume.Operations {
     }
 
     func reclaimItem(_ item: FSItem) async throws {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_ReclaimItem()
@@ -280,7 +302,7 @@ extension Volume: FSVolume.Operations {
     }
 
     func readSymbolicLink(_ item: FSItem) async throws -> FSFileName {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_ReadSymbolicLink()
@@ -303,14 +325,14 @@ extension Volume: FSVolume.Operations {
         inDirectory directory: FSItem,
         attributes newAttributes: FSItem.SetAttributesRequest
     ) async throws -> (FSItem, FSFileName) {
-        let directory = directory as! Item
+        let directory = try ensureItem(directory)
         log.d(
             "createItem: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
         )
 
         var request = Pb_CreateItem()
         request.name = name.data
-        request.type = Pb_ItemType(rawValue: type.rawValue)!
+        request.type = type.toProto()
         request.directoryID = directory.id
         request.attributes = newAttributes.toProto()
 
@@ -333,7 +355,7 @@ extension Volume: FSVolume.Operations {
         attributes newAttributes: FSItem.SetAttributesRequest,
         linkContents contents: FSFileName
     ) async throws -> (FSItem, FSFileName) {
-        let directory = directory as! Item
+        let directory = try ensureItem(directory)
         log.d(
             "createSymbolicLink: \(directory.name.string ?? "") (id = \(directory.id)), name = \(name.string ?? "")"
         )
@@ -362,8 +384,8 @@ extension Volume: FSVolume.Operations {
         named name: FSFileName,
         inDirectory directory: FSItem
     ) async throws -> FSFileName {
-        let item = item as! Item
-        let directory = directory as! Item
+        let item = try ensureItem(item)
+        let directory = try ensureItem(directory)
         log.d("createLink: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CreateLink()
@@ -388,8 +410,8 @@ extension Volume: FSVolume.Operations {
         named name: FSFileName,
         fromDirectory directory: FSItem
     ) async throws {
-        let item = item as! Item
-        let directory = directory as! Item
+        let item = try ensureItem(item)
+        let directory = try ensureItem(directory)
         log.d("removeItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_RemoveItem()
@@ -416,22 +438,27 @@ extension Volume: FSVolume.Operations {
         inDirectory destinationDirectory: FSItem,
         overItem: FSItem?
     ) async throws -> FSFileName {
-        let item = item as! Item
-        let sourceDirectory = sourceDirectory as! Item
-        let destinationDirectory = destinationDirectory as! Item
-        let overItem = overItem as? Item
+        let item = try ensureItem(item)
+        let sourceDirectory = try ensureItem(sourceDirectory)
+        let destinationDirectory = try ensureItem(destinationDirectory)
+        let resolvedOverItem: Item?
+        if let overItem {
+            resolvedOverItem = try ensureItem(overItem)
+        } else {
+            resolvedOverItem = nil
+        }
         log.d(
-            "renameItem: \(item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))"
+            "renameItem: \(sourceName.string ?? item.name.string ?? "") -> \(destinationName.string ?? "") (id = \(item.id))"
         )
 
         var request = Pb_RenameItem()
         request.itemID = item.id
         request.sourceDirectoryID = sourceDirectory.id
-        request.sourceName = item.name.data
+        request.sourceName = sourceName.data
         request.destinationName = destinationName.data
         request.destinationDirectoryID = destinationDirectory.id
-        if overItem != nil {
-            request.overItemID = overItem!.id
+        if let resolvedOverItem {
+            request.overItemID = resolvedOverItem.id
         }
 
         switch try socket.send(content: .renameItem(request)) {
@@ -453,7 +480,7 @@ extension Volume: FSVolume.Operations {
         attributes: FSItem.GetAttributesRequest?,
         packer: FSDirectoryEntryPacker
     ) async throws -> FSDirectoryVerifier {
-        let directory = directory as! Item
+        let directory = try ensureItem(directory)
         log.d(
             "enumerateDirectory: \(directory.name.string ?? "") (id = \(directory.id))"
         )
@@ -526,7 +553,7 @@ extension Volume: FSVolume.XattrOperations {
     }
 
     func supportedXattrNames(for item: FSItem) -> [FSFileName] {
-        let item = item as! Item
+        guard let item = optionalItem(item) else { return [] }
         log.d(
             "supportedXattrNames: \(item.name.string ?? "") (id = \(item.id))"
         )
@@ -550,7 +577,7 @@ extension Volume: FSVolume.XattrOperations {
     }
 
     func xattr(named name: FSFileName, of item: FSItem) async throws -> Data {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d(
             "getXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")"
         )
@@ -576,20 +603,18 @@ extension Volume: FSVolume.XattrOperations {
         on item: FSItem,
         policy: FSVolume.SetXattrPolicy
     ) async throws {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d(
             "setXattr: \(item.name.string ?? "") (id = \(item.id)), xattr = \(name.string ?? "")"
         )
 
         var request = Pb_SetXattr()
         request.name = name.data
-        if value != nil {
-            request.value = value!
+        if let value {
+            request.value = value
         }
         request.itemID = item.id
-        request.policy = Pb_SetXattr.SetXattrPolicy(
-            rawValue: Int(policy.rawValue)
-        )!
+        request.policy = policy.toProto()
 
         switch try socket.send(content: .setXattr(request)) {
         case .success(_):
@@ -603,7 +628,7 @@ extension Volume: FSVolume.XattrOperations {
     }
 
     func xattrs(of item: FSItem) async throws -> [FSFileName] {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("getXattrs: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_GetXattrs()
@@ -632,7 +657,7 @@ extension Volume: FSVolume.OpenCloseOperations {
     }
 
     func openItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("openItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_OpenItem()
@@ -651,7 +676,7 @@ extension Volume: FSVolume.OpenCloseOperations {
     }
 
     func closeItem(_ item: FSItem, modes: FSVolume.OpenModes) async throws {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("closeItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CloseItem()
@@ -677,7 +702,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         length: Int,
         into buffer: FSMutableFileDataBuffer
     ) async throws -> Int {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("read: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_Read()
@@ -705,7 +730,7 @@ extension Volume: FSVolume.ReadWriteOperations {
     func write(contents: Data, to item: FSItem, at offset: off_t) async throws
         -> Int
     {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("write: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_Write()
@@ -735,7 +760,7 @@ extension Volume: FSVolume.AccessCheckOperations {
         to theItem: FSItem,
         requestedAccess access: FSVolume.AccessMask
     ) async throws -> Bool {
-        let item = theItem as! Item
+        let item = try ensureItem(theItem)
         log.d("checkAccess: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CheckAccess()
@@ -790,7 +815,7 @@ extension Volume: FSVolume.PreallocateOperations {
         length: Int,
         flags: FSVolume.PreallocateFlags
     ) async throws -> Int {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("preallocateSpace: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_PreallocateSpace()
@@ -817,7 +842,7 @@ extension Volume: FSVolume.ItemDeactivation {
     }
 
     func deactivateItem(_ item: FSItem) async throws {
-        let item = item as! Item
+        let item = try ensureItem(item)
         log.d("deactivateItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_DeactivateItem()
@@ -909,7 +934,7 @@ extension FSVolume.SupportedCapabilities {
 
 extension FSStatFSResult {
     convenience init(_ result: Pb_StatFSResult) {
-        self.init(fileSystemTypeName: Bundle.main.fsShortName!)
+        self.init(fileSystemTypeName: Bundle.main.resolvedShortName)
         self.blockSize = Int(result.blockSize)
         self.ioSize = Int(result.ioSize)
         self.totalBlocks = result.totalBlocks
@@ -949,6 +974,19 @@ extension FSTaskOptions {
         var options = Pb_TaskOptions()
         options.taskOptions = self.taskOptions
         return options
+    }
+}
+
+extension FSSyncFlags {
+    func toProto() -> Pb_Synchronize.SyncFlags {
+        return Pb_Synchronize.SyncFlags(rawValue: self.rawValue)!
+
+    }
+}
+
+extension FSVolume.SetXattrPolicy {
+    func toProto() -> Pb_SetXattr.SetXattrPolicy {
+        return Pb_SetXattr.SetXattrPolicy(rawValue: Int(self.rawValue))!
     }
 }
 

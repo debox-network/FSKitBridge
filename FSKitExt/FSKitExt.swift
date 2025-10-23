@@ -9,22 +9,50 @@ struct FSKitExt: UnaryFileSystemExtension {
 }
 
 extension Bundle {
-    var serverPort: Int? {
-        guard
-            let attrs = infoDictionary?["Configuration"]
-                as? [String: Any],
-            let value = attrs["serverPort"] as? String
-        else { return nil }
-        return Int(value)
+    func getServerPort() throws -> Int {
+        guard let config = infoDictionary?["Configuration"] as? [String: Any]
+        else {
+            throw ConfigurationError.missingConfigurationRoot
+        }
+
+        guard let value = config["serverPort"] else {
+            throw ConfigurationError.missingValue(key: "serverPort")
+        }
+
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        if let string = value as? String,
+            let number = Int(
+                string.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        {
+            return number
+        }
+        throw ConfigurationError.invalidValue(key: "serverPort")
     }
 
     var fsShortName: String? {
         guard
             let attrs = infoDictionary?["EXAppExtensionAttributes"]
                 as? [String: Any],
-            let value = attrs["FSShortName"] as? String
+            let value = attrs["FSShortName"]
         else { return nil }
-        return value
+
+        if let string = value as? String {
+            return string
+        }
+        if let string = value as? NSString {
+            return string as String
+        }
+        return nil
+    }
+
+    var resolvedShortName: String {
+        if let value = fsShortName, !value.isEmpty {
+            return value
+        }
+        return bundleDisplayName
     }
 
     var fsSubType: Int? {
@@ -33,9 +61,50 @@ extension Bundle {
                 as? [String: Any],
             let pers = attrs["FSPersonalities"]
                 as? [String: Any],
-            let value = pers["FSSubType"] as? Int
+            let value = pers["FSSubType"]
         else { return nil }
-        return value
+
+        if let number = value as? NSNumber {
+            return number.intValue
+        }
+        if let intValue = value as? Int {
+            return intValue
+        }
+        return nil
+    }
+
+    var bundleDisplayName: String {
+        if let displayName = object(forInfoDictionaryKey: "CFBundleDisplayName")
+            as? String,
+            !displayName.isEmpty
+        {
+            return displayName
+        }
+        if let name = object(forInfoDictionaryKey: "CFBundleName") as? String,
+            !name.isEmpty
+        {
+            return name
+        }
+        return bundleURL.deletingPathExtension().lastPathComponent
+    }
+
+    enum ConfigurationError: LocalizedError {
+        case missingConfigurationRoot
+        case missingValue(key: String)
+        case invalidValue(key: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .missingConfigurationRoot:
+                return "Missing Configuration dictionary in Info.plist."
+            case .missingValue(let key):
+                return
+                    "Missing value for key \"\(key)\" in Configuration dictionary."
+            case .invalidValue(let key):
+                return
+                    "Invalid value for key \"\(key)\" in Configuration dictionary."
+            }
+        }
     }
 }
 

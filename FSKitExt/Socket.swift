@@ -9,8 +9,8 @@ final class Socket: @unchecked Sendable {
 
     private let log = Logger(subsystem: "FSKitExt", category: "Socket")
 
-    private var host: String!
-    private var port: Int!
+    private var host: String?
+    private var port: Int?
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
     private var pendingPromises:
@@ -19,8 +19,20 @@ final class Socket: @unchecked Sendable {
     private let promiseLock = NSLock()
 
     func initialize(host: String, port: Int) {
+        channelLock.lock()
+        defer { channelLock.unlock() }
+
+        failAllPromises(SocketError.notConnected)
+
         self.host = host
         self.port = port
+
+        if let channel, channel.isActive {
+            channel.close(mode: .all, promise: nil)
+            self.channel = nil
+        }
+
+        log.d("Socket configured for \(host):\(port)")
     }
 
     func send(content: Pb_Request.OneOf_Content) throws
@@ -28,44 +40,67 @@ final class Socket: @unchecked Sendable {
     {
         let channel = try getChannel()
 
-        var request = Pb_Request()
-        request.id = generateRequestID()
-        request.content = content
-
-        let buffer = try encodeLengthDelimited(
-            request,
-            allocator: channel.allocator
-        )
-
         let promise = channel.eventLoop.makePromise(
             of: Pb_Response.OneOf_Content.self
         )
-        promiseLock.lock()
-        pendingPromises[request.id] = promise
-        promiseLock.unlock()
+        let requestID = registerPromise(promise)
+
+        var request = Pb_Request()
+        request.id = requestID
+        request.content = content
+
+        let buffer: ByteBuffer
+        do {
+            buffer = try encodeLengthDelimited(
+                request,
+                allocator: channel.allocator
+            )
+        } catch {
+            failPromise(for: requestID, error: error)
+            throw error
+        }
 
         let timeout = channel.eventLoop.scheduleTask(in: .seconds(5)) {
-            promise.fail(SocketError.responseTimedOut)
+            [weak self] in
+            self?.failPromise(
+                for: requestID,
+                error: SocketError.responseTimedOut
+            )
         }
         defer { timeout.cancel() }
 
-        channel.writeAndFlush(buffer, promise: nil)
+        channel.writeAndFlush(buffer).whenFailure { [weak self] error in
+            self?.failPromise(for: requestID, error: error)
+        }
 
         return try promise.futureResult.wait()
     }
 
     func fulfillPromise(for requestID: UInt64, with response: Pb_Response) {
-        promiseLock.lock()
-        defer { promiseLock.unlock() }
-
-        if let promise = pendingPromises.removeValue(forKey: requestID) {
-            promise.succeed(response.content!)
+        if let promise = removePromise(for: requestID) {
+            if let content = response.content {
+                promise.succeed(content)
+            } else {
+                promise.fail(SocketError.missingContent)
+            }
         } else {
             log.e("No matching promise for requestID = \(requestID)")
         }
     }
 
+    func failAllPromises(_ error: Error) {
+        promiseLock.lock()
+        let promises = pendingPromises
+        pendingPromises = [:]
+        promiseLock.unlock()
+
+        for (_, promise) in promises {
+            promise.fail(error)
+        }
+    }
+
     func shutdown() {
+        failAllPromises(SocketError.notConnected)
         do {
             try channel?.close().wait()
             try group.syncShutdownGracefully()
@@ -79,40 +114,83 @@ final class Socket: @unchecked Sendable {
         channelLock.lock()
         defer { channelLock.unlock() }
 
-        if channel == nil || !channel!.isActive {
-            let bootstrap = ClientBootstrap(group: group)
-                .channelOption(
-                    ChannelOptions.socketOption(.so_reuseaddr),
-                    value: 1
-                )
-                .channelOption(
-                    ChannelOptions.socketOption(.so_keepalive),
-                    value: 1
-                )
-                .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
-                .channelInitializer { channel in
-                    channel.pipeline.addHandler(
-                        ByteToMessageHandler(LengthDelimitedDecoder())
-                    )
-                    .flatMap {
-                        channel.pipeline.addHandler(ResponseRouter(self))
-                    }
-                }
-            channel = try bootstrap.connect(host: host, port: port).wait()
-            log.d("Connected to \(host!):\(port!)")
+        guard let host = host, let port = port else {
+            throw SocketError.notConfigured
         }
+
+        if let current = channel, current.isActive {
+            return current
+        }
+
+        let bootstrap = ClientBootstrap(group: group)
+            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
+            .channelInitializer { channel in
+                channel.pipeline.addHandler(
+                    ByteToMessageHandler(LengthDelimitedDecoder())
+                )
+                .flatMap {
+                    channel.pipeline.addHandler(ResponseRouter(self))
+                }
+            }
+
+        channel = try bootstrap.connect(host: host, port: port).wait()
+        log.d("Connected to \(host):\(port)")
         return channel!
     }
 
-    private func generateRequestID() -> UInt64 {
-        return UInt64.random(in: 1...UInt64.max)
+    private func registerPromise(
+        _ promise: EventLoopPromise<Pb_Response.OneOf_Content>
+    ) -> UInt64 {
+        promiseLock.lock()
+        defer { promiseLock.unlock() }
+
+        var requestID: UInt64
+        repeat {
+            requestID = UInt64.random(in: 1...UInt64.max)
+        } while pendingPromises[requestID] != nil
+
+        pendingPromises[requestID] = promise
+        return requestID
+    }
+
+    private func removePromise(for requestID: UInt64) -> EventLoopPromise<
+        Pb_Response.OneOf_Content
+    >? {
+        promiseLock.lock()
+        defer { promiseLock.unlock() }
+        return pendingPromises.removeValue(forKey: requestID)
+    }
+
+    private func failPromise(for requestID: UInt64, error: Error) {
+        if let promise = removePromise(for: requestID) {
+            promise.fail(error)
+        }
     }
 }
 
-enum SocketError: Error {
+enum SocketError: LocalizedError {
+    case notConfigured
     case notConnected
     case invalidVarint
     case responseTimedOut
+    case missingContent
+
+    var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "Socket has not been configured with a host and port."
+        case .notConnected:
+            return "Socket is not connected."
+        case .invalidVarint:
+            return "Received invalid varint when decoding frame length."
+        case .responseTimedOut:
+            return "Timed out waiting for a response."
+        case .missingContent:
+            return "Received a response without any payload."
+        }
+    }
 }
 
 final class LengthDelimitedDecoder: ByteToMessageDecoder {
@@ -160,7 +238,10 @@ final class LengthDelimitedDecoder: ByteToMessageDecoder {
                 guard buffer.readableBytes >= expectedLength else {
                     return .needMoreData
                 }
-                let frame = buffer.readSlice(length: expectedLength)!
+                guard let frame = buffer.readSlice(length: expectedLength)
+                else {
+                    return .needMoreData
+                }
                 state = .waitingLength
                 context.fireChannelRead(wrapInboundOut(frame))
             }
@@ -210,11 +291,18 @@ final class ResponseRouter: ChannelInboundHandler {
             socket?.fulfillPromise(for: response.requestID, with: response)
         } catch {
             log.e("Failed to decode response: \(error.localizedDescription)")
+            socket?.failAllPromises(error)
         }
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         log.e("Router error: \(error.localizedDescription)")
+        socket?.failAllPromises(error)
         context.close(promise: nil)
+    }
+
+    func channelInactive(context: ChannelHandlerContext) {
+        socket?.failAllPromises(SocketError.notConnected)
+        context.fireChannelInactive()
     }
 }
