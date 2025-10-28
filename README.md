@@ -4,14 +4,12 @@ A minimal host app + FSKit extension that connects macOS **FSKit** to a non-Swif
 
 > Requires **macOS 15.4+**
 
----
 ## Why FSKitBridge?
 
 Apple introduced **FSKit** to replace kernel file-system kexts with a safer, user-space model. But FSKit’s public API is **Swift-centric**, while production filesystems often live where strong memory-safety (Rust), legacy codebases (C/C++), or ecosystem libraries (Go/Python) already exist. Without a bridge, teams face a false choice: rewrite everything in Swift or skip FSKit. **FSKitBridge** removes that barrier.
 
 > Swift where you must, your language where you want.
 
----
 ## Who should use this?
 
 - **Filesystem developers** who want to target macOS FSKit while keeping the core FS engine in **Rust/C/C++/Go/Python**.
@@ -20,48 +18,23 @@ Apple introduced **FSKit** to replace kernel file-system kexts with a safer, use
 
 > **fskit-rs:** Rust crate for the protocol and socket layer — build your Rust backend or use it as a reference for other-language implementations.
 
----
 ## Architecture
 
-<img src="docs/arch.svg"
-width="800"
-style="max-width:100%; height:auto;"
-alt="Architecture Diagram">
+Option 1 — HTML <img> (works on GitHub)
+
+<img src="docs/arch.svg" width="800" height="400" alt="Architecture Diagram">
+
+Option 2 — Responsive width (height auto)
+
+<img src="docs/arch.svg" width="800" style="max-width:100%; height:auto;" alt="Architecture Diagram">
+
+Option 3 — <object> embed
+
+<object type="image/svg+xml" data="docs/arch.svg" width="800" height="400">Architecture Diagram</object>
+
+Option 4  — plain
 
 ![Architecture Diagram](docs/arch.svg)
-
-```
-flowchart
-
-%% --- System side ---
-subgraph OS["macOS"]
-    PKD["PlugInKit / ExtensionKit<br/>(discovery, election, lifecycle)"]
-    VFS["FSKit host (VFS side)"]
-end
-
-%% --- App bundle with nested appex ---
-subgraph HostBundle["FSKitBridge.app"]
-    Host["UI / enablement only"]
-    subgraph AppeX["FSKitExt.appex - sandboxed"]
-        FSOps[FSUnaryFileSystem + Operations]
-    end
-end
-
-%% --- Backend process (your TCP server) ---
-subgraph Backend["Custom.app - user process"]
-    Rust["FS implementation (Rust/Python/etc.)<br/>TCP server + Protobuf"]
-end
-
-%% Registration / enablement path
-Host -. "Install / first launch<br/>(discovery, election)" .-> PKD
-
-%% Runtime IPC paths
-VFS <-->|"XPC (FSKit operations)"| FSOps
-FSOps <-->|"TCP (localhost)"| Rust
-
-%% Lifecycle management
-PKD -. "Launch / manage appex<br/>(separate process at runtime)" .-> AppeX
-```
 
 ### How it works
 
@@ -99,7 +72,6 @@ PKD -. "Launch / manage appex<br/>(separate process at runtime)" .-> AppeX
 
 > TCP (localhost) allows a signed appex to talk to an unsigned backend without an App Group; UNIX sockets would require a shared writable path.
 
----
 ## What’s in this repository?
 
 - **FSKitBridge.app** — Host app  
@@ -110,7 +82,6 @@ PKD -. "Launch / manage appex<br/>(separate process at runtime)" .-> AppeX
  
 > Both live in **this single repo** and are built together. The appex is inside the app bundle at `FSKitBridge.app/Contents/PlugIns/FSKitExt.appex`.
 
----
 ## The wire contract: `protocol.proto`
 
 - **Purpose:** A stable, language-neutral RPC schema between **FSKitExt** and your backend.
@@ -121,7 +92,6 @@ PKD -. "Launch / manage appex<br/>(separate process at runtime)" .-> AppeX
 
 > Any language with protobuf support can be your backend.
 
----
 ## How to use
 
 ### 1. Use it as-is (no code changes)
@@ -183,10 +153,10 @@ mount -F -t bridgefs none /Volumes/BridgeFS`
 
 **Ownership:** FSKit mounts run with `noowners`
 
----
-## @@@ TEST
+## TEST
 
----
+TBD
+
 ## License
 
 MIT. See `LICENSE` for details.
