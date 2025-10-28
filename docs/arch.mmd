@@ -1,0 +1,28 @@
+flowchart
+
+%% --- System side ---
+    subgraph OS["macOS"]
+        PKD["PlugInKit / ExtensionKit<br/>(discovery, election, lifecycle)"]
+        VFS["FSKit host (VFS side)"]
+    end
+
+%% --- App bundle with nested appex ---
+    subgraph HostBundle["FSKitBridge.app"]
+        Host["UI / enablement only"]
+        subgraph AppeX["FSKitExt.appex - sandboxed"]
+            FSOps[FSUnaryFileSystem + Operations]
+        end
+    end
+
+%% --- Backend process (your TCP server) ---
+    subgraph Backend["Custom.app - user process"]
+        Rust["FS implementation (Rust/Python/etc.)<br/>TCP server + Protobuf"]
+    end
+
+%% Registration / enablement path
+    Host -. " Install / first launch<br/>(discovery, election) " .-> PKD
+%% Runtime IPC paths
+    VFS <-->|" XPC (FSKit operations) "| FSOps
+    FSOps <-->|" TCP (localhost) "| Rust
+%% Lifecycle management
+    PKD -. " Launch / manage appex<br/>(separate process at runtime) " .-> AppeX

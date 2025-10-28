@@ -23,6 +23,13 @@ Apple introduced **FSKit** to replace kernel file-system kexts with a safer, use
 ---
 ## Architecture
 
+<img src="docs/arch.svg"
+width="800"
+style="max-width:100%; height:auto;"
+alt="Architecture Diagram">
+
+![Architecture Diagram](docs/arch.svg)
+
 ```
 flowchart
 
