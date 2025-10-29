@@ -20,21 +20,7 @@ Apple introduced **FSKit** to replace kernel file-system kexts with a safer, use
 
 ## Architecture
 
-Option 1 — HTML <img> (works on GitHub)
-
-<img src="docs/arch.svg" width="800" height="400" alt="Architecture Diagram">
-
-Option 2 — Responsive width (height auto)
-
-<img src="docs/arch.svg" width="800" style="max-width:100%; height:auto;" alt="Architecture Diagram">
-
-Option 3 — <object> embed
-
-<object type="image/svg+xml" data="docs/arch.svg" width="800" height="400">Architecture Diagram</object>
-
-Option 4  — plain
-
-![Architecture Diagram](docs/arch.svg)
+<img src="docs/arch.svg" width="800" height="800" alt="Architecture Diagram">
 
 ### How it works
 
@@ -122,12 +108,12 @@ Use the app as a template to build your own app bundle.
 Install the app bundle to `/Applications`.
 
 ```
-APP="/path/to/FSKitBridge.app"                                  # from GitHub Releases
-rm -rf /Applications/FSKitBridge.app                            # remove existing app bundle
-cp -r "$APP" /Applications                                      # copy app bundle
-xattr -dr com.apple.quarantine /Applications/FSKitBridge.app    # remove quarantine
-open -a /Applications/FSKitBridge.app                           # trigger PlugInKit discovery
-pluginkit -m -vv -p com.apple.fskit.fsmodule                    # verify appex is discovered
+APP="/path/to/FSKitBridge.app"                                # from GitHub Releases
+rm -rf /Applications/FSKitBridge.app                          # remove existing app bundle
+cp -r "$APP" /Applications                                    # copy app bundle
+xattr -dr com.apple.quarantine /Applications/FSKitBridge.app  # remove quarantine
+open -a /Applications/FSKitBridge.app                         # trigger PlugInKit discovery
+pluginkit -m -vv -p com.apple.fskit.fsmodule                  # verify appex is discovered
 ```
 
 If a previous version was installed, restart your Mac once the installation completes.
