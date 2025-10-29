@@ -2,11 +2,11 @@ import FSKit
 import Foundation
 import os
 
-final class BridgeFS: FSUnaryFileSystem, FSUnaryFileSystemOperations {
+final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
 
-    static let shared = BridgeFS()
+    static let shared = Bridge()
 
-    private let log = Logger(subsystem: "FSKitExt", category: "BridgeFS")
+    private let log = Logger(subsystem: "FSKitExt", category: "Bridge")
 
     private let socket = Socket.shared
 
