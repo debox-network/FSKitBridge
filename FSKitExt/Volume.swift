@@ -76,7 +76,7 @@ final class Volume: FSVolume {
         throws -> Item
     {
         guard let item = fsItem as? Item else {
-            log.e("\(fn): unexpected FSItem type \(type(of: fsItem))")
+            log.e("\(fn): unexpected FSItem type")
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
         return item
@@ -86,7 +86,7 @@ final class Volume: FSVolume {
         -> Item?
     {
         guard let item = fsItem as? Item else {
-            log.e("\(fn): unexpected FSItem type \(type(of: fsItem))")
+            log.e("\(fn): unexpected FSItem type")
             return nil
         }
         return item
