@@ -1,4 +1,4 @@
-# <img src="docs/icon.png" alt="FSKitBridge" width="28"> FSKitBridge
+# <img src="docs/icon.png" alt="FSKitBridge" width="24"> FSKitBridge
 
 A minimal host app + FSKit extension that connects macOS **FSKit** to a non-Swift file system backend over a local socket.
 
@@ -15,7 +15,7 @@ Apple introduced **FSKit** to replace kernel file system kexts with a safer, use
 - **File system developers** who want to target macOS FSKit while keeping the core file system engine in **Rust/C/C++/Go/Python**.  
 - Teams **migrating from legacy kext-based stacks** and seeking a clean, testable user-space boundary.
 
-> [`fskit-rs`](https://github.com/debox-network/fskit-rs): Rust crate for the protocol and socket layer—use it to build your Rust backend or as a reference for implementations in other languages.
+> [`fskit-rs`](https://github.com/debox-network/fskit-rs): Rust crate for the protocol and socket layer — use it to build your Rust backend or as a reference for implementations in other languages.
 
 ## Architecture
 
@@ -33,23 +33,23 @@ Apple introduced **FSKit** to replace kernel file system kexts with a safer, use
     - **FSUnaryFileSystem + Operations (FSOps):** Swift implementation of the FSKit protocols. Each VFS operation invoked by macOS is received here.
 
 - **Backend (separate user process)**
-  - **Custom.app — user process:** Your actual file system engine (e.g., Rust/Python/etc.). It exposes a **TCP localhost** service speaking a **length-delimited Protobuf** protocol.
+  - **Custom.app — user process:** Your actual file system engine (e.g., Rust/Python/etc.). It exposes a TCP localhost service speaking a length-delimited Protobuf protocol.
 
 - **Registration / enablement flow**
   - **Host → PKD:** On install/first launch, PlugInKit discovers the embedded extension and performs _election_. This makes your FSKit module available to the system.
 
 - **Runtime IPC paths**
-  - **VFS ⇄ FSOps via XPC:** At mount/runtime, macOS (FSKit host) calls your extension over **XPC**. This is the official FSKit path for all file system operations.
-  - **FSOps ⇄ Backend via TCP (localhost):** The extension forwards operations to your backend over **TCP** using Protobuf and receives results/errors in reply.
+  - **VFS ⇄ FSOps via XPC:** At mount/runtime, macOS (FSKit host) calls your extension over XPC. This is the official FSKit path for all file system operations.
+  - **FSOps ⇄ Backend via TCP (localhost):** The extension forwards operations to your backend over TCP using Protobuf and receives results/errors in reply.
 
 - **Lifecycle management**
   - **PKD → AppeX:** PlugInKit/ExtensionKit launches, monitors, and (re)starts the extension as needed. The appex is **not** running inside the host app process.
 
-> **Design choice:** TCP (localhost) allows a signed appex to talk to an unsigned backend without an App Group—unlike UNIX sockets, it doesn’t require a shared writable path.
+> **Design choice:** TCP (localhost) allows a signed appex to talk to an unsigned backend without an App Group — unlike UNIX sockets, it doesn’t require a shared writable path.
 
 ## The wire contract: `protocol.proto`
 
-- **Purpose:** a stable, language-neutral RPC schema between **FSKitExt** and your backend.  
+- **Purpose:** a stable, language-neutral RPC schema between FSKitExt and your backend.  
 - **Contents:** request/response messages for common file system operations, attribute structures, error codes mapped to POSIX `errno`.  
 - **Framing:** `u32` length (network byte order) + protobuf bytes.
 
@@ -69,7 +69,7 @@ Apple introduced **FSKit** to replace kernel file system kexts with a safer, use
 
 ### 1. Use it as-is
 
-Download the ready-made app from GitHub [`Releases`](https://github.com/debox-network/FSKitBridge/releases) and install it.
+Download the ready-made app from [`Releases`](https://github.com/debox-network/FSKitBridge/releases) and install it.
 
 - **Defaults**
   - FSKit type: `bridgefs` (must match `mount -F -t bridgefs …`)
