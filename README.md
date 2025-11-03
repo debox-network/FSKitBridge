@@ -26,7 +26,7 @@ Apple introduced **FSKit** to replace kernel file-system kexts with a safer, use
 
 - **macOS**
     
-    - **PlugInKit / ExtensionKit (PKD):** Discovers the embedded FSKit extension inside your app bundle, handles _election_ (which copy is active), launches the extension process when needed, and manages its lifecycle.
+    - **PlugInKit / ExtensionKit (PKD):** Discovers the embedded FSKit extension inside your host app, handles _election_ (which copy is active), launches the extension process when needed, and manages its lifecycle.
         
     - **FSKit host (VFS side) (VFS):** The system component that issues filesystem operations (lookup, read/write, enumerate, set attributes, etc.) to your extension over XPC.
         
@@ -58,59 +58,59 @@ Apple introduced **FSKit** to replace kernel file-system kexts with a safer, use
 
 > TCP (localhost) allows a signed appex to talk to an unsigned backend without an App Group; UNIX sockets would require a shared writable path.
 
-## What’s in this repository?
-
-- **FSKitBridge.app** — Host app  
-    Purpose: bundle/ship the FSKit extension.
- 
-- **FSKitExt.appex** — FSKit module (ExtensionKit)  
-    Implements FSKit operations and proxies them to the backend over a local socket.
- 
-> Both live in **this single repo** and are built together. The appex is inside the app bundle at `FSKitBridge.app/Contents/PlugIns/FSKitExt.appex`.
-
 ## The wire contract: `protocol.proto`
 
-- **Purpose:** A stable, language-neutral RPC schema between **FSKitExt** and your backend.
+- **Purpose:** a stable, language-neutral RPC schema between **FSKitExt** and your backend.
     
-- **Contents:** Request/response messages for common FS operations, attribute structures, error codes mapped to POSIX `errno`.
+- **Contents:** request/response messages for common FS operations, attribute structures, error codes mapped to POSIX `errno`.
     
 - **Framing:** `u32 length (network-byte-order)` + protobuf bytes.
 
 > Any language with protobuf support can be your backend.
 
+## What’s in this repository?
+
+- **FSKitBridge.app** — Host app  
+  Purpose: bundle/ship the FSKit extension.
+
+- **FSKitExt.appex** — FSKit module (ExtensionKit)  
+  Implements FSKit operations and proxies them to the backend over a local socket.
+
+> Both live in **this single repo** and are built together. The appex is inside the host app at `FSKitBridge.app/Contents/PlugIns/FSKitExt.appex`.
+
 ## How to use
 
-### 1. Use it as-is (no code changes)
+### 1. Use it as-is
 
 Grab the ready-made app from GitHub **Releases** and install it.
 
 - **Defaults**
-  - Filesystem type: **`bridgefs`** (must match `mount -F -t bridgefs …`).
-  - Backend endpoint: **TCP `127.0.0.1:35367`**.
+  - FSKit type: **`bridgefs`** (must match `mount -F -t bridgefs …`).
+  - TCP port: **`35367`**.
 
-### 2. Customize port or filesystem type
+### 2. Customize filesystem type or port
 
-Use the app as a template to build your own app bundle.
+Use the app as a template to build your own host app.
 
 - **Edit Info.plist (appex target)**
   - FSKit type
-    - Set `FSFileSystemType`, `FSKitExtPersonality → FSName`, and `FSShortName` to `"yourfs"` (this string is used by `mount -F -t yourfs …`).
+    - Set `FSFileSystemType`, `FSKitExtPersonality → FSName`, and `FSShortName` to `"yourfs"`.
   - TCP port
     - Set `Configuration → serverPort` to `"12345"` (project’s custom key consumed by the appex).
 
 
 - **Rebuild & Sign**  
   - Build the app + appex in Xcode with your signing identities.
-  - Notarize the app bundle for distribution.
+  - Notarize the host app for distribution.
 
-### 3. Install (terminal)
+### 3. Install
 
-Install the app bundle to `/Applications`.
+Install the host app to `/Applications`.
 
 ```
 APP="/path/to/FSKitBridge.app"                                # from GitHub Releases
-rm -rf /Applications/FSKitBridge.app                          # remove existing app bundle
-cp -r "$APP" /Applications                                    # copy app bundle
+rm -rf /Applications/FSKitBridge.app                          # remove existing host app
+cp -r "$APP" /Applications                                    # copy host app
 xattr -dr com.apple.quarantine /Applications/FSKitBridge.app  # remove quarantine
 open -a /Applications/FSKitBridge.app                         # trigger PlugInKit discovery
 pluginkit -m -vv -p com.apple.fskit.fsmodule                  # verify appex is discovered
@@ -135,14 +135,51 @@ sudo mkdir -p /Volumes/BridgeFS
 mount -F -t bridgefs none /Volumes/BridgeFS`
 ```
 
-**Mount point:** Avoid TCC-protected folders (Documents/Desktop/Downloads), `/Volumes/<Name>` is recommended.
+**Mount point:** avoid TCC-protected folders (Documents/Desktop/Downloads), `/Volumes/<Name>` is recommended.
 
-**Ownership:** FSKit mounts run with `noowners`
+**Ownership:** FSKit mounts run with `noowners`.
 
-## TEST
+## Testing
 
-TBD
+You can test your filesystem implementation using the fstest suite from the secfs.test collection
+(our fork includes FSKit glue, so the suite can target your FSKit extension directly).
+
+- Repo & suite: https://github.com/debox-network/secfs.test, suite fstest.
+- About fstest: a port of FreeBSD pjdfstest for macOS/Linux.
+
+### Clone & build
+
+```
+git clone https://github.com/debox-network/secfs.test
+cd secfs.test/fstest
+make
+```
+
+### Configure
+
+Edit the test config (e.g., fstest/tests/conf):
+
+```
+# Known file systems: UFS, ZFS, ext3, ext4, ntfs-3g, xfs, btrfs, glusterfs, HFS+, secfs, cgofuse, fskit
+fs="fskit"    # target FSKit
+
+# Feature flags (1 = supported, 0 = not supported)
+fifo=0        # Set to 0. FSKit does not support FIFOs (named pipes).
+hardlink=0    # FS-dependent. Set to 1 only if your backend implements hard links.
+ownership=0   # Set to 0. FSKit extensions are mounted with 'noowners', so POSIX uid/gid ownership isn’t enforced.
+xattr=0       # FS-dependent. Set to 1 only if your backend implements extended attributes.
+```
+
+### Run tests
+
+```
+cd /path/to/file/system/you/want/to/test/
+sudo prove -r /path/to/fstest/
+```
 
 ## License
 
-MIT. See `LICENSE` for details.
+This project is dual-licensed under Apache 2.0 and MIT terms:
+
+- Apache License, Version 2.0, [`LICENSE-APACHE`](./LICENSE-APACHE)
+- MIT license [`LICENSE-MIT`](./LICENSE-MIT)
