@@ -1,3 +1,21 @@
+/*
+  FSKitExt <-> Backend RPC Protocol
+  ---------------------------------
+  File: FSKitExt/protocol.proto
+  Source (persistent URL):
+    https://github.com/debox-network/FSKitBridge/blob/main/FSKitExt/protocol.proto
+
+  Purpose:
+    Language-neutral wire format between FSKitExt (Swift/ExtensionKit) and the
+    backend (e.g., Rust via fskit-fs). This protocol carries file system
+    operations (lookup, attributes, read/write, etc).
+
+  License:
+    SPDX-License-Identifier: MIT OR Apache-2.0
+    Copyright (c) 2025 Debox Network
+
+  This file is part of FSKitBridge. See LICENSE-MIT and LICENSE-APACHE at repo root.
+*/
 syntax = "proto3";
 
 package pb;
@@ -674,10 +692,10 @@ message Request {
   // The concrete operation this request carries.
   oneof content {
     // Configurations
-    GetResourceIdentifier get_resource_identifier = 2;
-    GetVolumeIdentifier get_volume_identifier = 3;
-    GetVolumeBehavior get_volume_behavior = 4;
-    GetPathConfOperations get_path_conf_operations = 5;
+    GetResourceIdentifier get_resource_identifier = 10;
+    GetVolumeIdentifier get_volume_identifier = 11;
+    GetVolumeBehavior get_volume_behavior = 12;
+    GetPathConfOperations get_path_conf_operations = 13;
 
     // Operations protocol.
     //
@@ -690,33 +708,33 @@ message Request {
     //
     // > Note: This protocol extends ``FSVolumePathConfOperations``, so your volume
     // implementation must also conform to that protocol.
-    GetVolumeCapabilities get_volume_capabilities = 6;
-    GetVolumeStatistics get_volume_statistics = 7;
-    Mount mount = 8;
-    Unmount unmount = 9;
-    Synchronize synchronize = 10;
-    GetAttributes get_attributes = 11;
-    SetAttributes set_attributes = 12;
-    LookupItem lookup_item = 13;
-    ReclaimItem reclaim_item = 14;
-    ReadSymbolicLink read_symbolic_link = 15;
-    CreateItem create_item = 16;
-    CreateSymbolicLink create_symbolic_link = 17;
-    CreateLink create_link = 18;
-    RemoveItem remove_item = 19;
-    RenameItem rename_item = 20;
-    EnumerateDirectory enumerate_directory = 21;
-    Activate activate = 22;
-    Deactivate deactivate = 23;
+    GetVolumeCapabilities get_volume_capabilities = 14;
+    GetVolumeStatistics get_volume_statistics = 15;
+    Mount mount = 16;
+    Unmount unmount = 17;
+    Synchronize synchronize = 18;
+    GetAttributes get_attributes = 19;
+    SetAttributes set_attributes = 20;
+    LookupItem lookup_item = 21;
+    ReclaimItem reclaim_item = 22;
+    ReadSymbolicLink read_symbolic_link = 23;
+    CreateItem create_item = 24;
+    CreateSymbolicLink create_symbolic_link = 25;
+    CreateLink create_link = 26;
+    RemoveItem remove_item = 27;
+    RenameItem rename_item = 28;
+    EnumerateDirectory enumerate_directory = 29;
+    Activate activate = 30;
+    Deactivate deactivate = 31;
 
     // XattrOperations protocol.
     //
     // Methods and properties implemented by volumes that natively or partially
     // support extended attributes.
-    GetSupportedXattrNames get_supported_xattr_names = 24;
-    GetXattr get_xattr = 25;
-    SetXattr set_xattr = 26;
-    GetXattrs get_xattrs = 27;
+    GetSupportedXattrNames get_supported_xattr_names = 32;
+    GetXattr get_xattr = 33;
+    SetXattr set_xattr = 34;
+    GetXattrs get_xattrs = 35;
 
     // OpenCloseOperations protocol.
     //
@@ -734,8 +752,8 @@ message Request {
     //
     // If a file system volume doesn't conform to this protocol, the kernel layer
     // can skip making such calls to the volume.
-    OpenItem open_item = 28;
-    CloseItem close_item = 29;
+    OpenItem open_item = 36;
+    CloseItem close_item = 37;
 
     // ReadWriteOperations protocol.
     //
@@ -751,20 +769,20 @@ message Request {
     // ``FSVolumeKernelOffloadedIOOperations``.
     // A volume that doesn't conform to either protocol can't support
     // any I/O operation.
-    Read read = 30;
-    Write write = 31;
+    Read read = 38;
+    Write write = 39;
 
     // AccessCheckOperations protocol.
     //
     // Methods and properties implemented by volumes that want to enforce access
     // check operations.
-    CheckAccess check_access = 32;
+    CheckAccess check_access = 40;
 
     // RenameOperations protocol.
     //
     // Methods and properties implemented by volumes that support renaming
     // the volume.
-    SetVolumeName set_volume_name = 33;
+    SetVolumeName set_volume_name = 41;
 
     // ``PreallocateFlags`` protocol.
     //
@@ -781,13 +799,13 @@ message Request {
     //
     // In a kernel-based file system, you typically preallocate space with the
     // `VNOP_ALLOCATE` operation, called from `fcntl(F_PREALLOCATE)`.
-    PreallocateSpace preallocate_space = 34;
+    PreallocateSpace preallocate_space = 42;
 
     // ItemDeactivation protocol.
     //
     // Methods and properties implemented by volumes that support
     // deactivating items.
-    DeactivateItem deactivate_item = 35;
+    DeactivateItem deactivate_item = 43;
   }
 }
 
@@ -1281,20 +1299,20 @@ message Response {
 
   // The concrete result payload for the handled request.
   oneof content {
-    ResourceIdentifier resource_identifier = 2;
-    VolumeIdentifier volume_identifier = 3;
-    VolumeBehavior volume_behavior = 4;
-    PathConfOperations path_conf_operations = 5;
-    SupportedCapabilities supported_capabilities = 6;
-    StatFSResult stat_fs_result = 7;
-    ItemAttributes item_attributes = 8;
-    Item item = 9;
-    DirectoryEntries directory_entries = 10;
-    Xattrs xattrs = 11;
-    bytes data = 12;
-    int64 byte_count = 13;
-    bool allow = 14;
-    Success success = 15;
-    int32 posix_error = 16;
+    ResourceIdentifier resource_identifier = 10;
+    VolumeIdentifier volume_identifier = 11;
+    VolumeBehavior volume_behavior = 12;
+    PathConfOperations path_conf_operations = 13;
+    SupportedCapabilities supported_capabilities = 14;
+    StatFSResult stat_fs_result = 15;
+    ItemAttributes item_attributes = 16;
+    Item item = 17;
+    DirectoryEntries directory_entries = 18;
+    Xattrs xattrs = 19;
+    bytes data = 20;
+    int64 byte_count = 21;
+    bool allow = 22;
+    Success success = 23;
+    int32 posix_error = 24;
   }
 }
