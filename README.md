@@ -2,7 +2,7 @@
   <img src="docs/icon.png" width="96" height="96" alt="FSKitBridge">
 </p>
 
-# FSKitBridge
+<h1 align="center">FSKitBridge</h1>
 
 A minimal host app + FSKit extension that connects macOS **FSKit** to a non-Swift file system backend over a local socket.
 
@@ -24,7 +24,7 @@ Apple introduced **FSKit** to replace kernel file system kexts with a safer, use
 ## Architecture
 
 <p align="center">
-  <img src="docs/arch.svg" width="800" height="600" alt="Architecture Diagram">
+  <img src="docs/arch.svg" width="780" height="580" alt="Architecture Diagram">
 </p>
 
 ### How it works
