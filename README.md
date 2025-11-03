@@ -104,7 +104,7 @@ open -a /Applications/FSKitBridge.app                         # trigger PlugInKi
 pluginkit -m -vv -p com.apple.fskit.fsmodule                  # verify appex is discovered
 ```
 
-If a previous version existed, consider a reboot after installation.
+If a previous version existed, consider a **reboot** after installation.
 
 ### 4. Enable extension
 
