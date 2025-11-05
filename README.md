@@ -98,17 +98,18 @@ Download the ready-made app from [`Releases`](https://github.com/debox-network/F
 
 #### Defaults
 
-- FSKit type: `bridgefs` (must match `mount -F -t bridgefs …`)
-- TCP port: `35367`
+- **FSKit type:** `fskitbridge` (must match `mount -F -t fskitbridge …`)
+- **TCP port:** `35367`
 
 ### 2. Customize file system type or port
 
 Use the app as a template.
 
-#### Edit Info.plist (appex target)
+#### Edit `Info.plist` (appex target)
 
-- FSKit type: set `FSFileSystemType`, `FSPersonalities → FSKitExtPersonality → FSName`, and `FSShortName` to `"yourfs"`.
-- TCP port: set `Configuration → serverPort` to `"12345"` (a custom key consumed by the appex).
+- **FSKit type:** set `FSFileSystemType`, `FSPersonalities → FSKitExtPersonality → FSName`, and `FSShortName` to
+  `"yourfs"`.
+- **TCP port:** set `Configuration → serverPort` to `"12345"` (a custom key consumed by the appex).
 
 #### Rebuild & sign
 
@@ -118,19 +119,30 @@ Use the app as a template.
 ### 3. Install
 
 ```bash
-APP="/path/to/FSKitBridge.app"                                # from GitHub Releases
-rm -rf /Applications/FSKitBridge.app                          # remove existing host app
-cp -r "$APP" /Applications                                    # copy host app
-xattr -dr com.apple.quarantine /Applications/FSKitBridge.app  # remove quarantine
-open -a /Applications/FSKitBridge.app                         # trigger PlugInKit discovery
-pluginkit -m -vv -p com.apple.fskit.fsmodule                  # verify appex is discovered
+# Path to the built FSKitBridge.app you want to install.
+APP="/path/to/FSKitBridge.app"
+
+# Remove any previously installed copy of FSKitBridge from /Applications.
+rm -rf /Applications/FSKitBridge.app
+
+# Copy the new build into the system Applications directory.
+cp -r "$APP" /Applications
+
+# Remove the quarantine attribute so macOS treats the app as trusted (avoids “unverified developer” warnings).
+xattr -dr com.apple.quarantine /Applications/FSKitBridge.app
+
+# Launch the host app once to register its FSKit extension with PlugInKit.
+open -a /Applications/FSKitBridge.app
+
+# List all registered FSKit modules (including your custom one) for verification.
+pluginkit -m -vv -p com.apple.fskit.fsmodule
 ```
 
-If a previous version existed, consider a **reboot** after installation.
+If an earlier installation was present, a **reboot** is required to finalize the installation.
 
 ### 4. Enable extension
 
-System Settings → General → Login Items & Extensions → **File System Extensions** → enable **FSKitExt**.
+System Settings → General → Login Items & Extensions → **File System Extensions** → enable **fskitbridge**.
 
 ### 5. Run backend
 
@@ -139,12 +151,37 @@ Start your backend server on `127.0.0.1:35367` (or your configured port) before 
 ### 6. Mount
 
 ```bash
-sudo mkdir -p /Volumes/BridgeFS
-mount -F -t bridgefs none /Volumes/BridgeFS
+# Ensure the mountpoint exists (sudo because /Volumes is system-owned).
+sudo mkdir -p /Volumes/MyFS
+
+# Create a sparse 1 MiB raw disk image.
+mkfile -n 1m /tmp/fskitbridge.dmg
+
+# Attach the image as a raw, *unmounted* device and capture the /dev/diskN path from hdiutil's output.
+DEVICE=$(hdiutil attach -imagekey diskimage-class=CRawDiskImage -nomount /tmp/fskitbridge.dmg)
+
+# Mount the file system using the type onto the mount point, passing the raw device we just attached.
+mount -F -t fskitbridge "$DEVICE" /Volumes/MyFS
+
+# Optional: show what got mounted for verification.
+mount | grep "/Volumes/MyFS"
 ```
 
 - **Mount point:** avoid TCC-protected folders (Documents/Desktop/Downloads). Prefer `/Volumes/<Name>`.
 - **Ownership:** FSKit mounts run with `noowners`.
+
+### 7. Unmount
+
+```bash
+# Force-unmount the file system from the mount point (ignore busy warnings).
+umount -f /Volumes/MyFS
+
+# Detach the virtual device created by hdiutil (frees the /dev/diskN handle).
+hdiutil detach "$DEVICE"
+
+# Delete the raw disk image.
+rm -f /tmp/fskitbridge.dmg
+```
 
 ## Tests
 
@@ -158,7 +195,7 @@ includes FSKit glue, so the suite can target your FSKit extension directly).
 
 ```bash
 git clone https://github.com/debox-network/secfs.test
-cd secfs.test/fstest
+cd secfs.test/fstest/fstest
 make
 ```
 
@@ -186,8 +223,8 @@ sudo prove -r /path/to/fstest/
 
 ### Logs
 
-`FSKitExt.appex` runs as a separate, system-managed process (launched by PlugInKit/ExtensionKit), so **stdout/stderr
-from the appex won’t appear in your terminal**. Use Apple’s **Unified Logging** instead.
+`FSKitExt.appex` runs as a separate, system-managed process (launched by PlugInKit/ExtensionKit), so stdout/stderr from
+the appex **won’t appear in your terminal**. Use Apple’s **Unified Logging** instead.
 
 #### Live logs
 

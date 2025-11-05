@@ -22,7 +22,7 @@
 			<string>nqy</string>
 		</dict>
 		<key>FSFileSystemType</key>
-		<string>bridgefs</string>
+		<string>fskitbridge</string>
 		<key>FSFormatOptionSyntax</key>
 		<dict>
 			<key>shortOptions</key>
@@ -35,7 +35,7 @@
 			<key>FSKitExtPersonality</key>
 			<dict>
 				<key>FSName</key>
-				<string>bridgefs</string>
+				<string>fskitbridge</string>
 				<key>FSfileObjectsAreCaseSensitive</key>
 				<false/>
 			</dict>
@@ -43,7 +43,7 @@
 		<key>FSRequiresSecurityScopedPathURLResources</key>
 		<false/>
 		<key>FSShortName</key>
-		<string>bridgefs</string>
+		<string>fskitbridge</string>
 		<key>FSSupportsBlockResources</key>
 		<true/>
 		<key>FSSupportsGenericURLResources</key>
