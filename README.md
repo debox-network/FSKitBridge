@@ -4,7 +4,7 @@
 
 <h1 align="center">FSKitBridge</h1>
 
-A minimal host app + FSKit extension that connects macOS **FSKit** to a non-Swift file system backend over a local
+A minimal host app + FSKit extension that connects macOS FSKit to a non-Swift file system backend over a local
 socket.
 
 > **Requires macOS 15.4+**
