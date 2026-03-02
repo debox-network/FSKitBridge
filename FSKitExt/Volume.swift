@@ -91,6 +91,18 @@ final class Volume: FSVolume {
         }
         return item
     }
+
+    private func upsertItem(_ item: Pb_Item) -> Item {
+        if let cur = items[item.attributes.fileID] {
+            cur.updateName(name: item.name)
+            cur.updateAttributes(attributes: item.attributes)
+            return cur
+        } else {
+            let new = Item(item)
+            items[new.id] = new
+            return new
+        }
+    }
 }
 
 extension Volume: FSVolume.PathConfOperations {
@@ -265,15 +277,8 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            if let item_ = items[item.attributes.fileID] {
-                item_.updateName(name: item.name)
-                item_.updateAttributes(attributes: item.attributes)
-                return (item_, item_.name)
-            } else {
-                let item = Item(item)
-                items[item.id] = item
-                return (item, item.name)
-            }
+            let item = upsertItem(item)
+            return (item, item.name)
         case .posixError(let code):
             log.posixError("lookupItem", code)
             throw fs_errorForPOSIXError(code)
@@ -493,7 +498,7 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .enumerateDirectory(request)) {
         case .directoryEntries(let entries):
             for entry in entries.entries {
-                let item = Item(entry.item)
+                let item = upsertItem(entry.item)
                 if !packer.packEntry(
                     name: item.name,
                     itemType: item.attributes.type,
