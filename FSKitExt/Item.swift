@@ -1,6 +1,10 @@
+import Darwin
 import FSKit
 import Foundation
 import SwiftProtobuf
+
+// Seconds for 1904-01-01 00:00:00 UTC in Unix epoch (1970-based)
+private let HFSUnixEpochOffset: Int = -2_082_844_800
 
 final class Item: FSItem {
 
@@ -158,8 +162,18 @@ extension timespec {
 
     func toProto() -> Google_Protobuf_Timestamp {
         var ts = Google_Protobuf_Timestamp()
-        ts.seconds = Int64(self.tv_sec)
-        ts.nanos = Int32(self.tv_nsec)
+        let norm = normalize()
+        ts.seconds = Int64(norm.tv_sec)
+        ts.nanos = Int32(norm.tv_nsec)
         return ts
+    }
+
+    private func normalize() -> timespec {
+        if self.tv_sec == HFSUnixEpochOffset {
+            var now = timespec()
+            clock_gettime(CLOCK_REALTIME, &now)
+            return now
+        }
+        return self
     }
 }
