@@ -20,10 +20,13 @@ final class Socket: @unchecked Sendable {
     private let promiseLock = NSLock()
 
     func initialize(host: String, port: Int) {
-        self.host = host
-        self.port = port
         channelLock.withLock {
+            self.host = host
+            self.port = port
+
+            pendingConnection = nil
             failAllPromises(SocketError.notConnected)
+
             if let channel, channel.isActive {
                 channel.close(mode: .all, promise: nil)
                 self.channel = nil
@@ -86,25 +89,37 @@ final class Socket: @unchecked Sendable {
     }
 
     private func getChannel() throws -> Channel {
-        try channelLock.withLock {
-            guard let host = host, let port = port else {
-                throw SocketError.notConfigured
+        let connectFuture = try getConnectionFuture()
+        do {
+            let connected = try connectFuture.wait()
+            return finalizeChannel(connected, for: connectFuture)
+        } catch {
+            channelLock.withLock {
+                if pendingConnection === connectFuture {
+                    pendingConnection = nil
+                }
             }
-
-            if let current = channel, current.isActive {
-                return current
-            }
-
-            let connected = try makeBootstrap().connect(host: host, port: port)
-                .wait()
-            channel = connected
-            log.d("Connected to \(host):\(port)")
-            return connected
+            throw error
         }
     }
 
     private func getChannelAsync() async throws -> Channel {
-        let connectFuture: EventLoopFuture<Channel> = try channelLock.withLock {
+        let connectFuture = try getConnectionFuture()
+        do {
+            let connected = try await connectFuture.asyncValue()
+            return finalizeChannel(connected, for: connectFuture)
+        } catch {
+            channelLock.withLock {
+                if pendingConnection === connectFuture {
+                    pendingConnection = nil
+                }
+            }
+            throw error
+        }
+    }
+
+    private func getConnectionFuture() throws -> EventLoopFuture<Channel> {
+        try channelLock.withLock {
             guard let host = host, let port = port else {
                 throw SocketError.notConfigured
             }
@@ -121,31 +136,31 @@ final class Socket: @unchecked Sendable {
             pendingConnection = future
             return future
         }
+    }
 
-        do {
-            let connected = try await connectFuture.asyncValue()
-            return channelLock.withLock {
+    private func finalizeChannel(
+        _ connected: Channel,
+        for connectFuture: EventLoopFuture<Channel>
+    ) -> Channel {
+        channelLock.withLock {
+            if pendingConnection === connectFuture {
                 pendingConnection = nil
-                if let current = channel, current.isActive {
-                    if ObjectIdentifier(current as AnyObject)
-                        != ObjectIdentifier(connected as AnyObject)
-                    {
-                        connected.close(mode: .all, promise: nil)
-                    }
-                    return current
+            }
+
+            if let current = channel, current.isActive {
+                if ObjectIdentifier(current as AnyObject)
+                    != ObjectIdentifier(connected as AnyObject)
+                {
+                    connected.close(mode: .all, promise: nil)
                 }
+                return current
+            }
 
-                channel = connected
-                log.d(
-                    "Connected to \(connected.remoteAddress?.description ?? "remote")"
-                )
-                return connected
-            }
-        } catch {
-            channelLock.withLock {
-                pendingConnection = nil
-            }
-            throw error
+            channel = connected
+            log.d(
+                "Connected to \(connected.remoteAddress?.description ?? "remote")"
+            )
+            return connected
         }
     }
 
@@ -358,6 +373,7 @@ final class ResponseRouter: ChannelInboundHandler {
         } catch {
             log.e("Failed to decode response: \(error.localizedDescription)")
             socket?.failAllPromises(error)
+            context.close(promise: nil)
         }
     }
 
