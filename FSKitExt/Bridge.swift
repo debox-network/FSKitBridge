@@ -30,25 +30,27 @@ final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
                 let response = try await socket.send(
                     content: .getResourceIdentifier(Pb_GetResourceIdentifier())
                 )
-                if case .resourceIdentifier(let value) = response {
-                    replyHandler(
-                        FSProbeResult.usable(
-                            name: value.name,
-                            containerID: FSContainerIdentifier(
-                                uuid: UUID(uuidString: value.containerID)
-                                    ?? UUID()
-                            )
-                        ),
-                        nil
+                guard case .resourceIdentifier(let value) = response else {
+                    throw BackendError.unexpectedResponse(
+                        operation: "probeResource"
                     )
-                    return
                 }
+
+                replyHandler(
+                    FSProbeResult.usable(
+                        name: value.name,
+                        containerID: FSContainerIdentifier(
+                            uuid: UUID(uuidString: value.containerID) ?? UUID()
+                        )
+                    ),
+                    nil
+                )
             } catch {
                 log.e(
                     "probeResource: failure (error = \(error.localizedDescription))"
                 )
+                replyHandler(nil, error)
             }
-            replyHandler(nil, nil)
         }
     }
 
@@ -63,19 +65,22 @@ final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
                 let response = try await socket.send(
                     content: .getVolumeIdentifier(Pb_GetVolumeIdentifier())
                 )
-                if case .volumeIdentifier(let value) = response {
-                    let volume = Volume(value)
-                    await volume.load()
-                    containerStatus = .ready
-                    replyHandler(volume, nil)
-                    return
+                guard case .volumeIdentifier(let value) = response else {
+                    throw BackendError.unexpectedResponse(
+                        operation: "loadResource"
+                    )
                 }
+
+                let volume = Volume(value)
+                try await volume.load()
+                containerStatus = .ready
+                replyHandler(volume, nil)
             } catch {
                 log.e(
                     "loadResource: failure (error = \(error.localizedDescription))"
                 )
+                replyHandler(nil, error)
             }
-            replyHandler(nil, nil)
         }
     }
 
@@ -90,5 +95,16 @@ final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
 
     func didFinishLoading() {
         log.d("didFinishLoading")
+    }
+}
+
+enum BackendError: LocalizedError {
+    case unexpectedResponse(operation: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unexpectedResponse(let operation):
+            return "Unexpected backend response during \(operation)."
+        }
     }
 }

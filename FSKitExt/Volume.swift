@@ -29,61 +29,51 @@ final class Volume: FSVolume {
         )
     }
 
-    func load() async {
-        volumeBehavior = await getVolumeBehavior()
-        pathConfOperations = await getPathConfOperations()
-        supportedCapabilities = await getVolumeCapabilities()
+    func load() async throws {
+        volumeBehavior = try await getVolumeBehavior()
+        pathConfOperations = try await getPathConfOperations()
+        supportedCapabilities = try await getVolumeCapabilities()
     }
 
-    private func getVolumeBehavior() async -> Pb_VolumeBehavior {
+    private func getVolumeBehavior() async throws -> Pb_VolumeBehavior {
         log.d("getVolumeBehavior")
-        do {
-            let response = try await socket.send(
-                content: .getVolumeBehavior(Pb_GetVolumeBehavior())
-            )
-            if case .volumeBehavior(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getVolumeBehavior: failure (error = \(error.localizedDescription))"
+        let response = try await socket.send(
+            content: .getVolumeBehavior(Pb_GetVolumeBehavior())
+        )
+        guard case .volumeBehavior(let value) = response else {
+            throw BackendError.unexpectedResponse(
+                operation: "getVolumeBehavior"
             )
         }
-        return Pb_VolumeBehavior()
+        return value
     }
 
-    private func getPathConfOperations() async -> Pb_PathConfOperations {
+    private func getPathConfOperations() async throws -> Pb_PathConfOperations {
         log.d("getPathConfOperations")
-        do {
-            let response = try await socket.send(
-                content: .getPathConfOperations(Pb_GetPathConfOperations())
-            )
-            if case .pathConfOperations(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getPathConfOperations: failure (error = \(error.localizedDescription))"
+        let response = try await socket.send(
+            content: .getPathConfOperations(Pb_GetPathConfOperations())
+        )
+        guard case .pathConfOperations(let value) = response else {
+            throw BackendError.unexpectedResponse(
+                operation: "getPathConfOperations"
             )
         }
-        return Pb_PathConfOperations()
+        return value
     }
 
-    private func getVolumeCapabilities() async -> Pb_SupportedCapabilities {
+    private func getVolumeCapabilities() async throws
+        -> Pb_SupportedCapabilities
+    {
         log.d("getVolumeCapabilities")
-        do {
-            let response = try await socket.send(
-                content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
-            )
-            if case .supportedCapabilities(let value) = response {
-                return value
-            }
-        } catch {
-            log.e(
-                "getVolumeCapabilities: failure (error = \(error.localizedDescription))"
+        let response = try await socket.send(
+            content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
+        )
+        guard case .supportedCapabilities(let value) = response else {
+            throw BackendError.unexpectedResponse(
+                operation: "getVolumeCapabilities"
             )
         }
-        return Pb_SupportedCapabilities()
+        return value
     }
 
     private func ensureItem(_ fsItem: FSItem, fn: StaticString = #function)
@@ -985,14 +975,16 @@ extension FSTaskOptions {
 
 extension FSSyncFlags {
     func toProto() -> Pb_Synchronize.SyncFlags {
-        return Pb_Synchronize.SyncFlags(rawValue: self.rawValue)!
-
+        return Pb_Synchronize.SyncFlags(rawValue: self.rawValue)
+            ?? .UNRECOGNIZED(self.rawValue)
     }
 }
 
 extension FSVolume.SetXattrPolicy {
     func toProto() -> Pb_SetXattr.SetXattrPolicy {
-        return Pb_SetXattr.SetXattrPolicy(rawValue: Int(self.rawValue))!
+        let rawValue = Int(self.rawValue)
+        return Pb_SetXattr.SetXattrPolicy(rawValue: rawValue)
+            ?? .UNRECOGNIZED(rawValue)
     }
 }
 

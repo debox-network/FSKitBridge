@@ -173,7 +173,8 @@ extension FSItem.Attributes {
 
 extension FSItem.ItemType {
     func toProto() -> Pb_ItemType {
-        return Pb_ItemType(rawValue: self.rawValue)!
+        return Pb_ItemType(rawValue: self.rawValue)
+            ?? .UNRECOGNIZED(self.rawValue)
     }
 }
 
