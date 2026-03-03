@@ -30,7 +30,7 @@ final class ItemCache {
     }
 
     func remove(_ id: UInt64) {
-        lock.withLock {
+        _ = lock.withLock {
             items.removeValue(forKey: id)
         }
     }

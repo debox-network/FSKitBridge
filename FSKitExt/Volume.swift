@@ -29,46 +29,61 @@ final class Volume: FSVolume {
         )
     }
 
-    func load() {
-        volumeBehavior = getVolumeBehavior()
-        pathConfOperations = getPathConfOperations()
-        supportedCapabilities = getVolumeCapabilities()
+    func load() async {
+        volumeBehavior = await getVolumeBehavior()
+        pathConfOperations = await getPathConfOperations()
+        supportedCapabilities = await getVolumeCapabilities()
     }
 
-    private func getVolumeBehavior() -> Pb_VolumeBehavior {
+    private func getVolumeBehavior() async -> Pb_VolumeBehavior {
         log.d("getVolumeBehavior")
-        let response = try? socket.send(
-            content: .getVolumeBehavior(Pb_GetVolumeBehavior())
-        )
-        return if case .volumeBehavior(let value) = response {
-            value
-        } else {
-            Pb_VolumeBehavior()
+        do {
+            let response = try await socket.send(
+                content: .getVolumeBehavior(Pb_GetVolumeBehavior())
+            )
+            if case .volumeBehavior(let value) = response {
+                return value
+            }
+        } catch {
+            log.e(
+                "getVolumeBehavior: failure (error = \(error.localizedDescription))"
+            )
         }
+        return Pb_VolumeBehavior()
     }
 
-    private func getPathConfOperations() -> Pb_PathConfOperations {
+    private func getPathConfOperations() async -> Pb_PathConfOperations {
         log.d("getPathConfOperations")
-        let response = try? socket.send(
-            content: .getPathConfOperations(Pb_GetPathConfOperations())
-        )
-        return if case .pathConfOperations(let value) = response {
-            value
-        } else {
-            Pb_PathConfOperations()
+        do {
+            let response = try await socket.send(
+                content: .getPathConfOperations(Pb_GetPathConfOperations())
+            )
+            if case .pathConfOperations(let value) = response {
+                return value
+            }
+        } catch {
+            log.e(
+                "getPathConfOperations: failure (error = \(error.localizedDescription))"
+            )
         }
+        return Pb_PathConfOperations()
     }
 
-    private func getVolumeCapabilities() -> Pb_SupportedCapabilities {
+    private func getVolumeCapabilities() async -> Pb_SupportedCapabilities {
         log.d("getVolumeCapabilities")
-        let response = try? socket.send(
-            content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
-        )
-        return if case .supportedCapabilities(let value) = response {
-            value
-        } else {
-            Pb_SupportedCapabilities()
+        do {
+            let response = try await socket.send(
+                content: .getVolumeCapabilities(Pb_GetVolumeCapabilities())
+            )
+            if case .supportedCapabilities(let value) = response {
+                return value
+            }
+        } catch {
+            log.e(
+                "getVolumeCapabilities: failure (error = \(error.localizedDescription))"
+            )
         }
+        return Pb_SupportedCapabilities()
     }
 
     private func ensureItem(_ fsItem: FSItem, fn: StaticString = #function)
@@ -165,7 +180,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_Mount()
         request.options = options.toProto()
 
-        switch try socket.send(content: .mount(request)) {
+        switch try await socket.send(content: .mount(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -178,7 +193,7 @@ extension Volume: FSVolume.Operations {
 
     func unmount() async {
         log.d("unmount")
-        switch try? socket.send(content: .unmount(Pb_Unmount())) {
+        switch try? await socket.send(content: .unmount(Pb_Unmount())) {
         case .success(_):
             return
         case .posixError(let error):
@@ -194,7 +209,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_Synchronize()
         request.flags = flags.toProto()
 
-        switch try socket.send(content: .synchronize(request)) {
+        switch try await socket.send(content: .synchronize(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -215,7 +230,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_GetAttributes()
         request.itemID = item.id
 
-        switch try socket.send(content: .getAttributes(request)) {
+        switch try await socket.send(content: .getAttributes(request)) {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
             return item.attributes
@@ -238,7 +253,7 @@ extension Volume: FSVolume.Operations {
         request.attributes = newAttributes.toProto()
         request.itemID = item.id
 
-        switch try socket.send(content: .setAttributes(request)) {
+        switch try await socket.send(content: .setAttributes(request)) {
         case .itemAttributes(let attributes):
             item.updateAttributes(attributes: attributes)
             return item.attributes
@@ -262,7 +277,7 @@ extension Volume: FSVolume.Operations {
         request.name = name.data
         request.directoryID = directory.id
 
-        switch try socket.send(content: .lookupItem(request)) {
+        switch try await socket.send(content: .lookupItem(request)) {
         case .item(let item):
             let item = items.upsert(item)
             return (item, item.name)
@@ -281,7 +296,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_ReclaimItem()
         request.itemID = item.id
 
-        switch try socket.send(content: .reclaimItem(request)) {
+        switch try await socket.send(content: .reclaimItem(request)) {
         case .success(_):
             items.remove(item.id)
             return
@@ -300,7 +315,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_ReadSymbolicLink()
         request.itemID = item.id
 
-        switch try socket.send(content: .readSymbolicLink(request)) {
+        switch try await socket.send(content: .readSymbolicLink(request)) {
         case .data(let data):
             return FSFileName(data: data)
         case .posixError(let code):
@@ -328,7 +343,7 @@ extension Volume: FSVolume.Operations {
         request.directoryID = directory.id
         request.attributes = newAttributes.toProto()
 
-        switch try socket.send(content: .createItem(request)) {
+        switch try await socket.send(content: .createItem(request)) {
         case .item(let item):
             let item = items.upsert(item)
             return (item, item.name)
@@ -357,7 +372,7 @@ extension Volume: FSVolume.Operations {
         request.newAttributes = newAttributes.toProto()
         request.contents = contents.data
 
-        switch try socket.send(content: .createSymbolicLink(request)) {
+        switch try await socket.send(content: .createSymbolicLink(request)) {
         case .item(let item):
             let item = items.upsert(item)
             return (item, item.name)
@@ -383,7 +398,7 @@ extension Volume: FSVolume.Operations {
         request.name = name.data
         request.directoryID = directory.id
 
-        switch try socket.send(content: .createLink(request)) {
+        switch try await socket.send(content: .createLink(request)) {
         case .data(let data):
             item.updateName(name: data)
             return item.name
@@ -409,7 +424,7 @@ extension Volume: FSVolume.Operations {
         request.name = name.data
         request.directoryID = directory.id
 
-        switch try socket.send(content: .removeItem(request)) {
+        switch try await socket.send(content: .removeItem(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -451,7 +466,7 @@ extension Volume: FSVolume.Operations {
             request.overItemID = resolvedOverItem.id
         }
 
-        switch try socket.send(content: .renameItem(request)) {
+        switch try await socket.send(content: .renameItem(request)) {
         case .data(let data):
             item.updateName(name: data)
             return item.name
@@ -480,7 +495,7 @@ extension Volume: FSVolume.Operations {
         request.cookie = cookie.rawValue
         request.verifier = verifier.rawValue
 
-        switch try socket.send(content: .enumerateDirectory(request)) {
+        switch try await socket.send(content: .enumerateDirectory(request)) {
         case .directoryEntries(let entries):
             for entry in entries.entries {
                 let item = items.upsert(entry.item)
@@ -509,7 +524,7 @@ extension Volume: FSVolume.Operations {
         var request = Pb_Activate()
         request.options = options.toProto()
 
-        switch try socket.send(content: .activate(request)) {
+        switch try await socket.send(content: .activate(request)) {
         case .item(let item):
             let item = items.upsert(item)
             return item
@@ -523,7 +538,7 @@ extension Volume: FSVolume.Operations {
 
     func deactivate(options: FSDeactivateOptions = []) async throws {
         log.d("deactivate")
-        switch try socket.send(content: .deactivate(Pb_Deactivate())) {
+        switch try await socket.send(content: .deactivate(Pb_Deactivate())) {
         case .success(_):
             return
         case .posixError(let code):
@@ -575,7 +590,7 @@ extension Volume: FSVolume.XattrOperations {
         request.name = name.data
         request.itemID = item.id
 
-        switch try socket.send(content: .getXattr(request)) {
+        switch try await socket.send(content: .getXattr(request)) {
         case .data(let data):
             return data
         case .posixError(let code):
@@ -605,7 +620,7 @@ extension Volume: FSVolume.XattrOperations {
         request.itemID = item.id
         request.policy = policy.toProto()
 
-        switch try socket.send(content: .setXattr(request)) {
+        switch try await socket.send(content: .setXattr(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -623,7 +638,7 @@ extension Volume: FSVolume.XattrOperations {
         var request = Pb_GetXattrs()
         request.itemID = item.id
 
-        switch try socket.send(content: .getXattrs(request)) {
+        switch try await socket.send(content: .getXattrs(request)) {
         case .xattrs(let xattrs):
             var names: [FSFileName] = []
             for name in xattrs.names {
@@ -653,7 +668,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         request.itemID = item.id
         request.modes = modes.toProto()
 
-        switch try socket.send(content: .openItem(request)) {
+        switch try await socket.send(content: .openItem(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -672,7 +687,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         request.itemID = item.id
         request.modes = modes.toProto()
 
-        switch try socket.send(content: .closeItem(request)) {
+        switch try await socket.send(content: .closeItem(request)) {
         case .success(_):
             return
         case .posixError(let code):
@@ -699,7 +714,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         request.offset = offset
         request.length = Int64(length)
 
-        switch try socket.send(content: .read(request)) {
+        switch try await socket.send(content: .read(request)) {
         case .data(let data):
             return data.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) in
                 let length = min(buffer.length, data.count)
@@ -727,7 +742,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         request.itemID = item.id
         request.offset = offset
 
-        switch try socket.send(content: .write(request)) {
+        switch try await socket.send(content: .write(request)) {
         case .byteCount(let count):
             return Int(count)
         case .posixError(let code):
@@ -756,7 +771,7 @@ extension Volume: FSVolume.AccessCheckOperations {
         request.itemID = item.id
         request.access = access.toProto()
 
-        switch try socket.send(content: .checkAccess(request)) {
+        switch try await socket.send(content: .checkAccess(request)) {
         case .allow(let allow):
             return allow
         case .posixError(let code):
@@ -780,7 +795,7 @@ extension Volume: FSVolume.RenameOperations {
         var request = Pb_SetVolumeName()
         request.name = name.data
 
-        switch try socket.send(content: .setVolumeName(request)) {
+        switch try await socket.send(content: .setVolumeName(request)) {
         case .data(let data):
             return FSFileName(data: data)
         case .posixError(let code):
@@ -813,7 +828,7 @@ extension Volume: FSVolume.PreallocateOperations {
         request.length = Int64(length)
         request.flags = flags.toProto()
 
-        switch try socket.send(content: .preallocateSpace(request)) {
+        switch try await socket.send(content: .preallocateSpace(request)) {
         case .byteCount(let count):
             return Int(count)
         case .posixError(let code):
@@ -837,7 +852,7 @@ extension Volume: FSVolume.ItemDeactivation {
         var request = Pb_DeactivateItem()
         request.itemID = item.id
 
-        switch try socket.send(content: .deactivateItem(request)) {
+        switch try await socket.send(content: .deactivateItem(request)) {
         case .success(_):
             return
         case .posixError(let code):

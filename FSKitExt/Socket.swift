@@ -1,5 +1,5 @@
 import Foundation
-import NIO
+@preconcurrency import NIO
 import SwiftProtobuf
 import os
 
@@ -13,25 +13,22 @@ final class Socket: @unchecked Sendable {
     private var port: Int?
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
+    private var pendingConnection: EventLoopFuture<Channel>?
     private var pendingPromises:
         [UInt64: EventLoopPromise<Pb_Response.OneOf_Content>] = [:]
     private let channelLock = NSLock()
     private let promiseLock = NSLock()
 
     func initialize(host: String, port: Int) {
-        channelLock.lock()
-        defer { channelLock.unlock() }
-
-        failAllPromises(SocketError.notConnected)
-
         self.host = host
         self.port = port
-
-        if let channel, channel.isActive {
-            channel.close(mode: .all, promise: nil)
-            self.channel = nil
+        channelLock.withLock {
+            failAllPromises(SocketError.notConnected)
+            if let channel, channel.isActive {
+                channel.close(mode: .all, promise: nil)
+                self.channel = nil
+            }
         }
-
         log.d("Socket configured for \(host):\(port)")
     }
 
@@ -39,7 +36,141 @@ final class Socket: @unchecked Sendable {
         -> Pb_Response.OneOf_Content
     {
         let channel = try getChannel()
+        let (promise, timeout) = try send(content: content, over: channel)
+        defer { timeout.cancel() }
+        return try promise.futureResult.wait()
+    }
 
+    func send(content: Pb_Request.OneOf_Content) async throws
+        -> Pb_Response.OneOf_Content
+    {
+        let channel = try await getChannelAsync()
+        let (promise, timeout) = try send(content: content, over: channel)
+        defer { timeout.cancel() }
+        return try await promise.futureResult.asyncValue()
+    }
+
+    func fulfillPromise(for requestID: UInt64, with response: Pb_Response) {
+        if let promise = removePromise(for: requestID) {
+            if let content = response.content {
+                promise.succeed(content)
+            } else {
+                promise.fail(SocketError.missingContent)
+            }
+        } else {
+            log.e("No matching promise for requestID = \(requestID)")
+        }
+    }
+
+    func failAllPromises(_ error: Error) {
+        let promises = promiseLock.withLock {
+            let promises = pendingPromises
+            pendingPromises = [:]
+            return promises
+        }
+
+        for (_, promise) in promises {
+            promise.fail(error)
+        }
+    }
+
+    func shutdown() {
+        failAllPromises(SocketError.notConnected)
+        do {
+            try channel?.close().wait()
+            try group.syncShutdownGracefully()
+            log.d("Client shutdown")
+        } catch {
+            log.e("Shutdown error: \(error.localizedDescription)")
+        }
+    }
+
+    private func getChannel() throws -> Channel {
+        try channelLock.withLock {
+            guard let host = host, let port = port else {
+                throw SocketError.notConfigured
+            }
+
+            if let current = channel, current.isActive {
+                return current
+            }
+
+            let connected = try makeBootstrap().connect(host: host, port: port)
+                .wait()
+            channel = connected
+            log.d("Connected to \(host):\(port)")
+            return connected
+        }
+    }
+
+    private func getChannelAsync() async throws -> Channel {
+        let connectFuture: EventLoopFuture<Channel> = try channelLock.withLock {
+            guard let host = host, let port = port else {
+                throw SocketError.notConfigured
+            }
+
+            if let current = channel, current.isActive {
+                return current.eventLoop.makeSucceededFuture(current)
+            }
+
+            if let pendingConnection {
+                return pendingConnection
+            }
+
+            let future = makeBootstrap().connect(host: host, port: port)
+            pendingConnection = future
+            return future
+        }
+
+        do {
+            let connected = try await connectFuture.asyncValue()
+            return channelLock.withLock {
+                pendingConnection = nil
+                if let current = channel, current.isActive {
+                    if ObjectIdentifier(current as AnyObject)
+                        != ObjectIdentifier(connected as AnyObject)
+                    {
+                        connected.close(mode: .all, promise: nil)
+                    }
+                    return current
+                }
+
+                channel = connected
+                log.d(
+                    "Connected to \(connected.remoteAddress?.description ?? "remote")"
+                )
+                return connected
+            }
+        } catch {
+            channelLock.withLock {
+                pendingConnection = nil
+            }
+            throw error
+        }
+    }
+
+    private func makeBootstrap() -> ClientBootstrap {
+        ClientBootstrap(group: group)
+            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
+            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
+            .channelInitializer { channel in
+                channel.pipeline.addHandler(
+                    ByteToMessageHandler(LengthDelimitedDecoder())
+                )
+                .flatMap {
+                    channel.pipeline.addHandler(ResponseRouter(self))
+                }
+            }
+    }
+
+    private func send(
+        content: Pb_Request.OneOf_Content,
+        over channel: Channel
+    ) throws -> (
+        EventLoopPromise<Pb_Response.OneOf_Content>,
+        Scheduled<Void>
+    ) {
         let promise = channel.eventLoop.makePromise(
             of: Pb_Response.OneOf_Content.self
         )
@@ -62,105 +193,40 @@ final class Socket: @unchecked Sendable {
 
         let timeout = channel.eventLoop.scheduleTask(in: .seconds(5)) {
             [weak self] in
-            self?.failPromise(
+            guard let self else { return }
+            self.failPromise(
                 for: requestID,
                 error: SocketError.responseTimedOut
             )
         }
-        defer { timeout.cancel() }
 
         channel.writeAndFlush(buffer).whenFailure { [weak self] error in
             self?.failPromise(for: requestID, error: error)
         }
 
-        return try promise.futureResult.wait()
-    }
-
-    func fulfillPromise(for requestID: UInt64, with response: Pb_Response) {
-        if let promise = removePromise(for: requestID) {
-            if let content = response.content {
-                promise.succeed(content)
-            } else {
-                promise.fail(SocketError.missingContent)
-            }
-        } else {
-            log.e("No matching promise for requestID = \(requestID)")
-        }
-    }
-
-    func failAllPromises(_ error: Error) {
-        promiseLock.lock()
-        let promises = pendingPromises
-        pendingPromises = [:]
-        promiseLock.unlock()
-
-        for (_, promise) in promises {
-            promise.fail(error)
-        }
-    }
-
-    func shutdown() {
-        failAllPromises(SocketError.notConnected)
-        do {
-            try channel?.close().wait()
-            try group.syncShutdownGracefully()
-            log.d("Client shutdown")
-        } catch {
-            log.e("Shutdown error: \(error.localizedDescription)")
-        }
-    }
-
-    private func getChannel() throws -> Channel {
-        channelLock.lock()
-        defer { channelLock.unlock() }
-
-        guard let host = host, let port = port else {
-            throw SocketError.notConfigured
-        }
-
-        if let current = channel, current.isActive {
-            return current
-        }
-
-        let bootstrap = ClientBootstrap(group: group)
-            .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
-            .channelOption(ChannelOptions.socketOption(.so_keepalive), value: 1)
-            .channelOption(ChannelOptions.tcpOption(.tcp_nodelay), value: 1)
-            .channelInitializer { channel in
-                channel.pipeline.addHandler(
-                    ByteToMessageHandler(LengthDelimitedDecoder())
-                )
-                .flatMap {
-                    channel.pipeline.addHandler(ResponseRouter(self))
-                }
-            }
-
-        channel = try bootstrap.connect(host: host, port: port).wait()
-        log.d("Connected to \(host):\(port)")
-        return channel!
+        return (promise, timeout)
     }
 
     private func registerPromise(
         _ promise: EventLoopPromise<Pb_Response.OneOf_Content>
     ) -> UInt64 {
-        promiseLock.lock()
-        defer { promiseLock.unlock() }
+        promiseLock.withLock {
+            var requestID: UInt64
+            repeat {
+                requestID = UInt64.random(in: 1...UInt64.max)
+            } while pendingPromises[requestID] != nil
 
-        var requestID: UInt64
-        repeat {
-            requestID = UInt64.random(in: 1...UInt64.max)
-        } while pendingPromises[requestID] != nil
-
-        pendingPromises[requestID] = promise
-        return requestID
+            pendingPromises[requestID] = promise
+            return requestID
+        }
     }
 
     private func removePromise(for requestID: UInt64) -> EventLoopPromise<
         Pb_Response.OneOf_Content
     >? {
-        promiseLock.lock()
-        defer { promiseLock.unlock() }
-        return pendingPromises.removeValue(forKey: requestID)
+        promiseLock.withLock {
+            pendingPromises.removeValue(forKey: requestID)
+        }
     }
 
     private func failPromise(for requestID: UInt64, error: Error) {
@@ -304,5 +370,15 @@ final class ResponseRouter: ChannelInboundHandler {
     func channelInactive(context: ChannelHandlerContext) {
         socket?.failAllPromises(SocketError.notConnected)
         context.fireChannelInactive()
+    }
+}
+
+extension EventLoopFuture {
+    func asyncValue() async throws -> Value {
+        try await withCheckedThrowingContinuation { continuation in
+            whenComplete { result in
+                continuation.resume(with: result)
+            }
+        }
     }
 }

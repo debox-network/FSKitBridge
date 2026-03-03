@@ -25,28 +25,31 @@ final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
         replyHandler: @escaping (FSProbeResult?, (any Error)?) -> Void
     ) {
         log.d("probeResource")
-        do {
-            let response = try socket.send(
-                content: .getResourceIdentifier(Pb_GetResourceIdentifier())
-            )
-            if case .resourceIdentifier(let value) = response {
-                replyHandler(
-                    FSProbeResult.usable(
-                        name: value.name,
-                        containerID: FSContainerIdentifier(
-                            uuid: UUID(uuidString: value.containerID) ?? UUID()
-                        )
-                    ),
-                    nil
+        Task {
+            do {
+                let response = try await socket.send(
+                    content: .getResourceIdentifier(Pb_GetResourceIdentifier())
                 )
-                return
+                if case .resourceIdentifier(let value) = response {
+                    replyHandler(
+                        FSProbeResult.usable(
+                            name: value.name,
+                            containerID: FSContainerIdentifier(
+                                uuid: UUID(uuidString: value.containerID)
+                                    ?? UUID()
+                            )
+                        ),
+                        nil
+                    )
+                    return
+                }
+            } catch {
+                log.e(
+                    "probeResource: failure (error = \(error.localizedDescription))"
+                )
             }
-        } catch {
-            log.e(
-                "probeResource: failure (error = \(error.localizedDescription))"
-            )
+            replyHandler(nil, nil)
         }
-        replyHandler(nil, nil)
     }
 
     func loadResource(
@@ -55,23 +58,25 @@ final class Bridge: FSUnaryFileSystem, FSUnaryFileSystemOperations {
         replyHandler: @escaping (FSVolume?, (any Error)?) -> Void
     ) {
         log.d("loadResource")
-        do {
-            let response = try socket.send(
-                content: .getVolumeIdentifier(Pb_GetVolumeIdentifier())
-            )
-            if case .volumeIdentifier(let value) = response {
-                let volume = Volume(value)
-                volume.load()
-                containerStatus = .ready
-                replyHandler(volume, nil)
-                return
+        Task {
+            do {
+                let response = try await socket.send(
+                    content: .getVolumeIdentifier(Pb_GetVolumeIdentifier())
+                )
+                if case .volumeIdentifier(let value) = response {
+                    let volume = Volume(value)
+                    await volume.load()
+                    containerStatus = .ready
+                    replyHandler(volume, nil)
+                    return
+                }
+            } catch {
+                log.e(
+                    "loadResource: failure (error = \(error.localizedDescription))"
+                )
             }
-        } catch {
-            log.e(
-                "loadResource: failure (error = \(error.localizedDescription))"
-            )
+            replyHandler(nil, nil)
         }
-        replyHandler(nil, nil)
     }
 
     func unloadResource(
