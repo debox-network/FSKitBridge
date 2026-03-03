@@ -7,23 +7,39 @@ import SwiftProtobuf
 private let HFSUnixEpochOffset: Int = -2_082_844_800
 
 final class Item: FSItem {
+    private let lock = NSLock()
+    private var _name: FSFileName
+    private var _attributes: FSItem.Attributes
 
-    private(set) var name: FSFileName
-    private(set) var attributes: FSItem.Attributes
+    var name: FSFileName {
+        lock.withLock { _name }
+    }
 
-    var id: UInt64 { attributes.fileID.rawValue }
+    var attributes: FSItem.Attributes {
+        lock.withLock { _attributes }
+    }
+
+    var id: UInt64 {
+        lock.withLock { _attributes.fileID.rawValue }
+    }
 
     init(_ item: Pb_Item) {
-        self.name = FSFileName(data: item.name)
-        self.attributes = FSItem.Attributes(item.attributes)
+        _name = FSFileName(data: item.name)
+        _attributes = FSItem.Attributes(item.attributes)
     }
 
     func updateName(name: Data) {
-        self.name = FSFileName(data: name)
+        let name = FSFileName(data: name)
+        lock.withLock {
+            _name = name
+        }
     }
 
     func updateAttributes(attributes: Pb_ItemAttributes) {
-        self.attributes = FSItem.Attributes(attributes)
+        let attributes = FSItem.Attributes(attributes)
+        lock.withLock {
+            _attributes = attributes
+        }
     }
 }
 
@@ -39,8 +55,11 @@ extension FSItem.Attributes {
         if attributes.hasMode {
             self.mode = attributes.mode
         }
-        if attributes.hasType {
-            self.type = FSItem.ItemType(rawValue: attributes.type.rawValue)!
+        if attributes.hasType,
+            let type = FSItem.ItemType(rawValue: attributes.type.rawValue)
+        {
+            self.type = type
+
         }
         if attributes.hasLinkCount {
             self.linkCount = attributes.linkCount
@@ -54,11 +73,17 @@ extension FSItem.Attributes {
         if attributes.hasAllocSize {
             self.allocSize = attributes.allocSize
         }
-        if attributes.hasFileID {
-            self.fileID = FSItem.Identifier(rawValue: attributes.fileID)!
+        if attributes.hasFileID,
+            let fileID = FSItem.Identifier(rawValue: attributes.fileID)
+        {
+            self.fileID = fileID
+
         }
-        if attributes.hasParentID {
-            self.parentID = FSItem.Identifier(rawValue: attributes.parentID)!
+        if attributes.hasParentID,
+            let parentID = FSItem.Identifier(rawValue: attributes.parentID)
+        {
+            self.parentID = parentID
+
         }
         if attributes.hasSupportsLimitedXattrs {
             self.supportsLimitedXAttrs = attributes.supportsLimitedXattrs

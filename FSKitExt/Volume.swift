@@ -7,12 +7,11 @@ final class Volume: FSVolume {
     private let log = Logger(subsystem: "FSKitExt", category: "Volume")
 
     private let socket = Socket.shared
+    private let items = ItemCache()
 
     private var volumeBehavior: Pb_VolumeBehavior!
     private var pathConfOperations: Pb_PathConfOperations!
     private var supportedCapabilities: Pb_SupportedCapabilities!
-
-    private var items: [UInt64: Item] = [:]
 
     init(_ identifier: Pb_VolumeIdentifier) {
         let volumeName: String
@@ -79,7 +78,7 @@ final class Volume: FSVolume {
             log.e("\(fn): unexpected FSItem type")
             throw fs_errorForPOSIXError(POSIXError.ENOENT.rawValue)
         }
-        return item
+        return items.resolve(item)
     }
 
     private func optionalItem(_ fsItem: FSItem, fn: StaticString = #function)
@@ -89,19 +88,7 @@ final class Volume: FSVolume {
             log.e("\(fn): unexpected FSItem type")
             return nil
         }
-        return item
-    }
-
-    private func upsertItem(_ item: Pb_Item) -> Item {
-        if let cur = items[item.attributes.fileID] {
-            cur.updateName(name: item.name)
-            cur.updateAttributes(attributes: item.attributes)
-            return cur
-        } else {
-            let new = Item(item)
-            items[new.id] = new
-            return new
-        }
+        return items.resolve(item)
     }
 }
 
@@ -277,7 +264,7 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            let item = upsertItem(item)
+            let item = items.upsert(item)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("lookupItem", code)
@@ -296,7 +283,7 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .reclaimItem(request)) {
         case .success(_):
-            items.removeValue(forKey: item.id)
+            items.remove(item.id)
             return
         case .posixError(let code):
             log.posixError("reclaimItem", code)
@@ -343,8 +330,7 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .createItem(request)) {
         case .item(let item):
-            let item = Item(item)
-            items[item.id] = item
+            let item = items.upsert(item)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("createItem", code)
@@ -373,8 +359,7 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .createSymbolicLink(request)) {
         case .item(let item):
-            let item = Item(item)
-            items[item.id] = item
+            let item = items.upsert(item)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("createSymbolicLink", code)
@@ -498,7 +483,7 @@ extension Volume: FSVolume.Operations {
         switch try socket.send(content: .enumerateDirectory(request)) {
         case .directoryEntries(let entries):
             for entry in entries.entries {
-                let item = upsertItem(entry.item)
+                let item = items.upsert(entry.item)
                 if !packer.packEntry(
                     name: item.name,
                     itemType: item.attributes.type,
@@ -526,8 +511,7 @@ extension Volume: FSVolume.Operations {
 
         switch try socket.send(content: .activate(request)) {
         case .item(let item):
-            let item = Item(item)
-            items[item.id] = item
+            let item = items.upsert(item)
             return item
         case .posixError(let code):
             log.posixError("activate", code)
@@ -929,10 +913,12 @@ extension FSVolume.SupportedCapabilities {
         if capabilities.hasSupportsVolumeGroups {
             self.supportsVolumeGroups = capabilities.supportsVolumeGroups
         }
-        if capabilities.hasCaseFormat {
-            self.caseFormat = FSVolume.CaseFormat(
+        if capabilities.hasCaseFormat,
+            let caseFormat = FSVolume.CaseFormat(
                 rawValue: capabilities.caseFormat.rawValue
-            )!
+            )
+        {
+            self.caseFormat = caseFormat
         }
     }
 }

@@ -121,3 +121,11 @@ extension Logger {
         self.e("\(function): failure (code = \(code))")
     }
 }
+
+extension NSLock {
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock()
+        defer { unlock() }
+        return try body()
+    }
+}
