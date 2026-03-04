@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- Decouple FSKit item IDs from backend entry IDs.
+- Refactor bridge socket I/O to `async/await`.
+
 ### Fixed
 - Replace HFS epoch (1904-01-01) sentinel timestamps with `timeNow`.
 
