@@ -55,20 +55,6 @@ final class Item: FSItem {
         }
     }
 
-    func update(item: Pb_Item, entryID: UInt64, parentID: UInt64) {
-        let name = FSFileName(data: item.name)
-        let attrs = FSItem.Attributes(
-            item.attributes,
-            fileID: _id,
-            parentID: parentID
-        )
-        lock.withLock {
-            _entryID = entryID
-            _name = name
-            _attributes = attrs
-        }
-    }
-
     func updateAttributes(attrs: Pb_ItemAttributes) {
         let attrs = FSItem.Attributes(attrs, fileID: _id, parentID: parentID)
         lock.withLock {
@@ -83,6 +69,20 @@ final class Item: FSItem {
             if let parent = FSItem.Identifier(rawValue: parentID) {
                 _attributes.parentID = parent
             }
+        }
+    }
+
+    func update(item: Pb_Item, entryID: UInt64, parentID: UInt64) {
+        let name = FSFileName(data: item.name)
+        let attrs = FSItem.Attributes(
+            item.attributes,
+            fileID: _id,
+            parentID: parentID
+        )
+        lock.withLock {
+            _entryID = entryID
+            _name = name
+            _attributes = attrs
         }
     }
 }
@@ -245,7 +245,7 @@ extension timespec {
     }
 
     private func normalize() -> timespec {
-        if self.tv_sec == HFSUnixEpochOffset {
+        if tv_sec == HFSUnixEpochOffset {
             var now = timespec()
             clock_gettime(CLOCK_REALTIME, &now)
             return now

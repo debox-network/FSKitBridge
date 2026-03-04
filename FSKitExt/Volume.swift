@@ -857,65 +857,65 @@ extension FSVolume.SupportedCapabilities {
     convenience init(_ capabilities: Pb_SupportedCapabilities) {
         self.init()
         if capabilities.hasSupportsPersistentObjectIds {
-            self.supportsPersistentObjectIDs =
+            supportsPersistentObjectIDs =
                 capabilities.supportsPersistentObjectIds
         }
         if capabilities.hasSupportsSymbolicLinks {
-            self.supportsSymbolicLinks = capabilities.supportsSymbolicLinks
+            supportsSymbolicLinks = capabilities.supportsSymbolicLinks
         }
         if capabilities.hasSupportsHardLinks {
-            self.supportsHardLinks = capabilities.supportsHardLinks
+            supportsHardLinks = capabilities.supportsHardLinks
         }
         if capabilities.hasSupportsJournal {
-            self.supportsJournal = capabilities.supportsJournal
+            supportsJournal = capabilities.supportsJournal
         }
         if capabilities.hasSupportsActiveJournal {
-            self.supportsActiveJournal = capabilities.supportsActiveJournal
+            supportsActiveJournal = capabilities.supportsActiveJournal
         }
         if capabilities.hasDoesNotSupportRootTimes {
-            self.doesNotSupportRootTimes = capabilities.doesNotSupportRootTimes
+            doesNotSupportRootTimes = capabilities.doesNotSupportRootTimes
         }
         if capabilities.hasSupportsSparseFiles {
-            self.supportsSparseFiles = capabilities.supportsSparseFiles
+            supportsSparseFiles = capabilities.supportsSparseFiles
         }
         if capabilities.hasSupportsZeroRuns {
-            self.supportsZeroRuns = capabilities.supportsZeroRuns
+            supportsZeroRuns = capabilities.supportsZeroRuns
         }
         if capabilities.hasSupportsFastStatfs {
-            self.supportsFastStatFS = capabilities.supportsFastStatfs
+            supportsFastStatFS = capabilities.supportsFastStatfs
         }
         if capabilities.hasSupports2TbFiles {
-            self.supports2TBFiles = capabilities.supports2TbFiles
+            supports2TBFiles = capabilities.supports2TbFiles
         }
         if capabilities.hasSupportsOpenDenyModes {
-            self.supportsOpenDenyModes = capabilities.supportsOpenDenyModes
+            supportsOpenDenyModes = capabilities.supportsOpenDenyModes
         }
         if capabilities.hasSupportsHiddenFiles {
-            self.supportsHiddenFiles = capabilities.supportsHiddenFiles
+            supportsHiddenFiles = capabilities.supportsHiddenFiles
         }
         if capabilities.hasDoesNotSupportVolumeSizes {
-            self.doesNotSupportVolumeSizes =
+            doesNotSupportVolumeSizes =
                 capabilities.doesNotSupportVolumeSizes
         }
         if capabilities.hasSupports64BitObjectIds {
-            self.supports64BitObjectIDs = capabilities.supports64BitObjectIds
+            supports64BitObjectIDs = capabilities.supports64BitObjectIds
         }
         if capabilities.hasSupportsDocumentID {
-            self.supportsDocumentID = capabilities.supportsDocumentID
+            supportsDocumentID = capabilities.supportsDocumentID
         }
         if capabilities.hasDoesNotSupportImmutableFiles {
-            self.doesNotSupportImmutableFiles =
+            doesNotSupportImmutableFiles =
                 capabilities.doesNotSupportImmutableFiles
         }
         if capabilities.hasDoesNotSupportSettingFilePermissions {
-            self.doesNotSupportSettingFilePermissions =
+            doesNotSupportSettingFilePermissions =
                 capabilities.doesNotSupportSettingFilePermissions
         }
         if capabilities.hasSupportsSharedSpace {
-            self.supportsSharedSpace = capabilities.supportsSharedSpace
+            supportsSharedSpace = capabilities.supportsSharedSpace
         }
         if capabilities.hasSupportsVolumeGroups {
-            self.supportsVolumeGroups = capabilities.supportsVolumeGroups
+            supportsVolumeGroups = capabilities.supportsVolumeGroups
         }
         if capabilities.hasCaseFormat,
             let caseFormat = FSVolume.CaseFormat(
@@ -930,19 +930,19 @@ extension FSVolume.SupportedCapabilities {
 extension FSStatFSResult {
     convenience init(_ result: Pb_StatFSResult) {
         self.init(fileSystemTypeName: Bundle.main.resolvedShortName)
-        self.blockSize = Int(result.blockSize)
-        self.ioSize = Int(result.ioSize)
-        self.totalBlocks = result.totalBlocks
-        self.availableBlocks = result.availableBlocks
-        self.freeBlocks = result.freeBlocks
-        self.usedBlocks = result.usedBlocks
-        self.totalBytes = result.totalBytes
-        self.availableBytes = result.availableBytes
-        self.freeBytes = result.freeBytes
-        self.usedBytes = result.usedBytes
-        self.totalFiles = result.totalFiles
-        self.freeFiles = result.freeFiles
-        self.fileSystemSubType = Bundle.main.fsSubType ?? 0
+        blockSize = Int(result.blockSize)
+        ioSize = Int(result.ioSize)
+        totalBlocks = result.totalBlocks
+        availableBlocks = result.availableBlocks
+        freeBlocks = result.freeBlocks
+        usedBlocks = result.usedBlocks
+        totalBytes = result.totalBytes
+        availableBytes = result.availableBytes
+        freeBytes = result.freeBytes
+        usedBytes = result.usedBytes
+        totalFiles = result.totalFiles
+        freeFiles = result.freeFiles
+        fileSystemSubType = Bundle.main.fsSubType ?? 0
     }
 }
 
@@ -952,11 +952,11 @@ extension FSVolume.ItemDeactivationOptions {
         for option in options {
             switch option {
             case .always:
-                self.insert(.always)
+                insert(.always)
             case .forRemovedItems:
-                self.insert(.forRemovedItems)
+                insert(.forRemovedItems)
             case .forPreallocatedItems:
-                self.insert(.forPreallocatedItems)
+                insert(.forPreallocatedItems)
             case .UNRECOGNIZED(_):
                 continue
             }
@@ -967,31 +967,31 @@ extension FSVolume.ItemDeactivationOptions {
 extension FSTaskOptions {
     func toProto() -> Pb_TaskOptions {
         var options = Pb_TaskOptions()
-        options.taskOptions = self.taskOptions
+        options.taskOptions = taskOptions
         return options
     }
 }
 
 extension FSSyncFlags {
     func toProto() -> Pb_Synchronize.SyncFlags {
-        return Pb_Synchronize.SyncFlags(rawValue: self.rawValue)
-            ?? .UNRECOGNIZED(self.rawValue)
+        return Pb_Synchronize.SyncFlags(rawValue: rawValue)
+            ?? .UNRECOGNIZED(rawValue)
     }
 }
 
 extension FSVolume.SetXattrPolicy {
     func toProto() -> Pb_SetXattr.SetXattrPolicy {
-        let rawValue = Int(self.rawValue)
-        return Pb_SetXattr.SetXattrPolicy(rawValue: rawValue)
-            ?? .UNRECOGNIZED(rawValue)
+        let value = Int(rawValue)
+        return Pb_SetXattr.SetXattrPolicy(rawValue: value)
+            ?? .UNRECOGNIZED(value)
     }
 }
 
 extension FSVolume.OpenModes {
     func toProto() -> [Pb_OpenMode] {
         var out: [Pb_OpenMode] = []
-        if self.contains(.read) { out.append(.read) }
-        if self.contains(.write) { out.append(.write) }
+        if contains(.read) { out.append(.read) }
+        if contains(.write) { out.append(.write) }
         return out
     }
 }
@@ -999,23 +999,23 @@ extension FSVolume.OpenModes {
 extension FSVolume.AccessMask {
     func toProto() -> [Pb_CheckAccess.AccessMask] {
         var out: [Pb_CheckAccess.AccessMask] = []
-        if self.contains(.readData) { out.append(.readData) }
-        if self.contains(.listDirectory) { out.append(.listDirectory) }
-        if self.contains(.writeData) { out.append(.writeData) }
-        if self.contains(.addFile) { out.append(.addFile) }
-        if self.contains(.execute) { out.append(.execute) }
-        if self.contains(.search) { out.append(.search) }
-        if self.contains(.delete) { out.append(.delete) }
-        if self.contains(.appendData) { out.append(.appendData) }
-        if self.contains(.addSubdirectory) { out.append(.addSubdirectory) }
-        if self.contains(.deleteChild) { out.append(.deleteChild) }
-        if self.contains(.readAttributes) { out.append(.readAttributes) }
-        if self.contains(.writeAttributes) { out.append(.writeAttributes) }
-        if self.contains(.readXattr) { out.append(.readXattr) }
-        if self.contains(.writeXattr) { out.append(.writeXattr) }
-        if self.contains(.readSecurity) { out.append(.readSecurity) }
-        if self.contains(.writeSecurity) { out.append(.writeSecurity) }
-        if self.contains(.takeOwnership) { out.append(.takeOwnership) }
+        if contains(.readData) { out.append(.readData) }
+        if contains(.listDirectory) { out.append(.listDirectory) }
+        if contains(.writeData) { out.append(.writeData) }
+        if contains(.addFile) { out.append(.addFile) }
+        if contains(.execute) { out.append(.execute) }
+        if contains(.search) { out.append(.search) }
+        if contains(.delete) { out.append(.delete) }
+        if contains(.appendData) { out.append(.appendData) }
+        if contains(.addSubdirectory) { out.append(.addSubdirectory) }
+        if contains(.deleteChild) { out.append(.deleteChild) }
+        if contains(.readAttributes) { out.append(.readAttributes) }
+        if contains(.writeAttributes) { out.append(.writeAttributes) }
+        if contains(.readXattr) { out.append(.readXattr) }
+        if contains(.writeXattr) { out.append(.writeXattr) }
+        if contains(.readSecurity) { out.append(.readSecurity) }
+        if contains(.writeSecurity) { out.append(.writeSecurity) }
+        if contains(.takeOwnership) { out.append(.takeOwnership) }
         return out
     }
 }
@@ -1023,10 +1023,10 @@ extension FSVolume.AccessMask {
 extension FSVolume.PreallocateFlags {
     func toProto() -> [Pb_PreallocateSpace.PreallocateFlag] {
         var out: [Pb_PreallocateSpace.PreallocateFlag] = []
-        if self.contains(.contiguous) { out.append(.contiguous) }
-        if self.contains(.all) { out.append(.all) }
-        if self.contains(.persist) { out.append(.persist) }
-        if self.contains(.fromEOF) { out.append(.fromEof) }
+        if contains(.contiguous) { out.append(.contiguous) }
+        if contains(.all) { out.append(.all) }
+        if contains(.persist) { out.append(.persist) }
+        if contains(.fromEOF) { out.append(.fromEof) }
         return out
     }
 }

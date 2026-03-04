@@ -17,7 +17,6 @@ final class ItemCache {
             if let current = itemsByID[item.id] {
                 return current
             }
-
             itemsByID[item.id] = item
             itemsByEntryID[item.entryID] = item.id
             itemsByKey[key(item.parentID, item.nameData)] = item.id
