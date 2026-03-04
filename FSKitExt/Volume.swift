@@ -218,11 +218,11 @@ extension Volume: FSVolume.Operations {
         log.d("getAttributes: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_GetAttributes()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .getAttributes(request)) {
         case .itemAttributes(let attributes):
-            item.updateAttributes(attributes: attributes)
+            item.updateAttributes(attrs: attributes)
             return item.attributes
         case .posixError(let code):
             log.posixError("getAttributes", code)
@@ -241,11 +241,11 @@ extension Volume: FSVolume.Operations {
 
         var request = Pb_SetAttributes()
         request.attributes = newAttributes.toProto()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .setAttributes(request)) {
         case .itemAttributes(let attributes):
-            item.updateAttributes(attributes: attributes)
+            item.updateAttributes(attrs: attributes)
             return item.attributes
         case .posixError(let code):
             log.posixError("setAttributes", code)
@@ -265,11 +265,11 @@ extension Volume: FSVolume.Operations {
 
         var request = Pb_LookupItem()
         request.name = name.data
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
 
         switch try await socket.send(content: .lookupItem(request)) {
         case .item(let item):
-            let item = items.upsert(item)
+            let item = items.upsert(item, inParent: directory.id)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("lookupItem", code)
@@ -284,7 +284,7 @@ extension Volume: FSVolume.Operations {
         log.d("reclaimItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_ReclaimItem()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .reclaimItem(request)) {
         case .success(_):
@@ -303,7 +303,7 @@ extension Volume: FSVolume.Operations {
         log.d("readSymbolicLink: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_ReadSymbolicLink()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .readSymbolicLink(request)) {
         case .data(let data):
@@ -330,12 +330,12 @@ extension Volume: FSVolume.Operations {
         var request = Pb_CreateItem()
         request.name = name.data
         request.type = type.toProto()
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
         request.attributes = newAttributes.toProto()
 
         switch try await socket.send(content: .createItem(request)) {
         case .item(let item):
-            let item = items.upsert(item)
+            let item = items.upsert(item, inParent: directory.id)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("createItem", code)
@@ -358,13 +358,13 @@ extension Volume: FSVolume.Operations {
 
         var request = Pb_CreateSymbolicLink()
         request.name = name.data
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
         request.newAttributes = newAttributes.toProto()
         request.contents = contents.data
 
         switch try await socket.send(content: .createSymbolicLink(request)) {
         case .item(let item):
-            let item = items.upsert(item)
+            let item = items.upsert(item, inParent: directory.id)
             return (item, item.name)
         case .posixError(let code):
             log.posixError("createSymbolicLink", code)
@@ -384,14 +384,13 @@ extension Volume: FSVolume.Operations {
         log.d("createLink: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CreateLink()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.name = name.data
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
 
         switch try await socket.send(content: .createLink(request)) {
         case .data(let data):
-            item.updateName(name: data)
-            return item.name
+            return FSFileName(data: data)
         case .posixError(let code):
             log.posixError("createLink", code)
             throw fs_errorForPOSIXError(code)
@@ -410,9 +409,9 @@ extension Volume: FSVolume.Operations {
         log.d("removeItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_RemoveItem()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.name = name.data
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
 
         switch try await socket.send(content: .removeItem(request)) {
         case .success(_):
@@ -447,18 +446,18 @@ extension Volume: FSVolume.Operations {
         )
 
         var request = Pb_RenameItem()
-        request.itemID = item.id
-        request.sourceDirectoryID = sourceDirectory.id
+        request.itemID = item.entryID
+        request.sourceDirectoryID = sourceDirectory.entryID
         request.sourceName = sourceName.data
         request.destinationName = destinationName.data
-        request.destinationDirectoryID = destinationDirectory.id
+        request.destinationDirectoryID = destinationDirectory.entryID
         if let resolvedOverItem {
-            request.overItemID = resolvedOverItem.id
+            request.overItemID = resolvedOverItem.entryID
         }
 
         switch try await socket.send(content: .renameItem(request)) {
         case .data(let data):
-            item.updateName(name: data)
+            items.move(item, to: data, inParent: destinationDirectory.id)
             return item.name
         case .posixError(let code):
             log.posixError("renameItem", code)
@@ -481,14 +480,14 @@ extension Volume: FSVolume.Operations {
         )
 
         var request = Pb_EnumerateDirectory()
-        request.directoryID = directory.id
+        request.directoryID = directory.entryID
         request.cookie = cookie.rawValue
         request.verifier = verifier.rawValue
 
         switch try await socket.send(content: .enumerateDirectory(request)) {
         case .directoryEntries(let entries):
             for entry in entries.entries {
-                let item = items.upsert(entry.item)
+                let item = items.upsert(entry.item, inParent: directory.id)
                 if !packer.packEntry(
                     name: item.name,
                     itemType: item.attributes.type,
@@ -516,7 +515,7 @@ extension Volume: FSVolume.Operations {
 
         switch try await socket.send(content: .activate(request)) {
         case .item(let item):
-            let item = items.upsert(item)
+            let item = items.upsertRoot(item)
             return item
         case .posixError(let code):
             log.posixError("activate", code)
@@ -553,7 +552,7 @@ extension Volume: FSVolume.XattrOperations {
         )
 
         var request = Pb_GetSupportedXattrNames()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try? socket.send(content: .getSupportedXattrNames(request)) {
         case .xattrs(let xattrs):
@@ -578,7 +577,7 @@ extension Volume: FSVolume.XattrOperations {
 
         var request = Pb_GetXattr()
         request.name = name.data
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .getXattr(request)) {
         case .data(let data):
@@ -607,7 +606,7 @@ extension Volume: FSVolume.XattrOperations {
         if let value {
             request.value = value
         }
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.policy = policy.toProto()
 
         switch try await socket.send(content: .setXattr(request)) {
@@ -626,7 +625,7 @@ extension Volume: FSVolume.XattrOperations {
         log.d("getXattrs: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_GetXattrs()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .getXattrs(request)) {
         case .xattrs(let xattrs):
@@ -655,7 +654,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         log.d("openItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_OpenItem()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.modes = modes.toProto()
 
         switch try await socket.send(content: .openItem(request)) {
@@ -674,7 +673,7 @@ extension Volume: FSVolume.OpenCloseOperations {
         log.d("closeItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CloseItem()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.modes = modes.toProto()
 
         switch try await socket.send(content: .closeItem(request)) {
@@ -700,7 +699,7 @@ extension Volume: FSVolume.ReadWriteOperations {
         log.d("read: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_Read()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.offset = offset
         request.length = Int64(length)
 
@@ -729,7 +728,7 @@ extension Volume: FSVolume.ReadWriteOperations {
 
         var request = Pb_Write()
         request.contents = contents
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.offset = offset
 
         switch try await socket.send(content: .write(request)) {
@@ -758,7 +757,7 @@ extension Volume: FSVolume.AccessCheckOperations {
         log.d("checkAccess: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_CheckAccess()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.access = access.toProto()
 
         switch try await socket.send(content: .checkAccess(request)) {
@@ -813,7 +812,7 @@ extension Volume: FSVolume.PreallocateOperations {
         log.d("preallocateSpace: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_PreallocateSpace()
-        request.itemID = item.id
+        request.itemID = item.entryID
         request.offset = offset
         request.length = Int64(length)
         request.flags = flags.toProto()
@@ -840,7 +839,7 @@ extension Volume: FSVolume.ItemDeactivation {
         log.d("deactivateItem: \(item.name.string ?? "") (id = \(item.id))")
 
         var request = Pb_DeactivateItem()
-        request.itemID = item.id
+        request.itemID = item.entryID
 
         switch try await socket.send(content: .deactivateItem(request)) {
         case .success(_):
