@@ -7,148 +7,224 @@ import SwiftProtobuf
 private let HFSUnixEpochOffset: Int = -2_082_844_800
 
 final class Item: FSItem {
+    private let lock = NSLock()
+    private let _id: UInt64
+    private var _entryID: UInt64
+    private var _name: FSFileName
+    private var _attributes: FSItem.Attributes
 
-    private(set) var name: FSFileName
-    private(set) var attributes: FSItem.Attributes
+    var id: UInt64 {
+        _id
+    }
 
-    var id: UInt64 { attributes.fileID.rawValue }
+    var entryID: UInt64 {
+        lock.withLock { _entryID }
+    }
 
-    init(_ item: Pb_Item) {
-        self.name = FSFileName(data: item.name)
-        self.attributes = FSItem.Attributes(item.attributes)
+    var parentID: UInt64 {
+        lock.withLock { _attributes.parentID.rawValue }
+    }
+
+    var name: FSFileName {
+        lock.withLock { _name }
+    }
+
+    var nameData: Data {
+        lock.withLock { _name.data }
+    }
+
+    var attributes: FSItem.Attributes {
+        lock.withLock { _attributes }
+    }
+
+    init(id: UInt64, item: Pb_Item, parentID: UInt64) {
+        _id = id
+        _entryID = item.attributes.fileID
+        _name = FSFileName(data: item.name)
+        _attributes = FSItem.Attributes(
+            item.attributes,
+            fileID: id,
+            parentID: parentID
+        )
     }
 
     func updateName(name: Data) {
-        self.name = FSFileName(data: name)
+        let name = FSFileName(data: name)
+        lock.withLock {
+            _name = name
+        }
     }
 
-    func updateAttributes(attributes: Pb_ItemAttributes) {
-        self.attributes = FSItem.Attributes(attributes)
+    func updateAttributes(attrs: Pb_ItemAttributes) {
+        let attrs = FSItem.Attributes(attrs, fileID: _id, parentID: parentID)
+        lock.withLock {
+            _attributes = attrs
+        }
+    }
+
+    func updateDirectoryEntry(name: Data, parentID: UInt64) {
+        let name = FSFileName(data: name)
+        lock.withLock {
+            _name = name
+            if let parent = FSItem.Identifier(rawValue: parentID) {
+                _attributes.parentID = parent
+            }
+        }
+    }
+
+    func update(item: Pb_Item, entryID: UInt64, parentID: UInt64) {
+        let name = FSFileName(data: item.name)
+        let attrs = FSItem.Attributes(
+            item.attributes,
+            fileID: _id,
+            parentID: parentID
+        )
+        lock.withLock {
+            _entryID = entryID
+            _name = name
+            _attributes = attrs
+        }
     }
 }
 
 extension FSItem.Attributes {
-    convenience init(_ attributes: Pb_ItemAttributes) {
+    convenience init(
+        _ attrs: Pb_ItemAttributes,
+        fileID: UInt64? = nil,
+        parentID: UInt64? = nil
+    ) {
         self.init()
-        if attributes.hasUid {
-            self.uid = attributes.uid
+        if attrs.hasUid {
+            uid = attrs.uid
         }
-        if attributes.hasGid {
-            self.gid = attributes.gid
+        if attrs.hasGid {
+            gid = attrs.gid
         }
-        if attributes.hasMode {
-            self.mode = attributes.mode
+        if attrs.hasMode {
+            mode = attrs.mode
         }
-        if attributes.hasType {
-            self.type = FSItem.ItemType(rawValue: attributes.type.rawValue)!
+        if attrs.hasType,
+            let type = FSItem.ItemType(rawValue: attrs.type.rawValue)
+        {
+            self.type = type
         }
-        if attributes.hasLinkCount {
-            self.linkCount = attributes.linkCount
+        if attrs.hasLinkCount {
+            linkCount = attrs.linkCount
         }
-        if attributes.hasFlags {
-            self.flags = attributes.flags
+        if attrs.hasFlags {
+            flags = attrs.flags
         }
-        if attributes.hasSize {
-            self.size = attributes.size
+        if attrs.hasSize {
+            size = attrs.size
         }
-        if attributes.hasAllocSize {
-            self.allocSize = attributes.allocSize
+        if attrs.hasAllocSize {
+            allocSize = attrs.allocSize
         }
-        if attributes.hasFileID {
-            self.fileID = FSItem.Identifier(rawValue: attributes.fileID)!
+        if let fileID, let fileID = FSItem.Identifier(rawValue: fileID) {
+            self.fileID = fileID
+        } else if attrs.hasFileID,
+            let fileID = FSItem.Identifier(rawValue: attrs.fileID)
+        {
+            self.fileID = fileID
         }
-        if attributes.hasParentID {
-            self.parentID = FSItem.Identifier(rawValue: attributes.parentID)!
+        if let parentID,
+            let parentID = FSItem.Identifier(rawValue: parentID)
+        {
+            self.parentID = parentID
+        } else if attrs.hasParentID,
+            let parentID = FSItem.Identifier(rawValue: attrs.parentID)
+        {
+            self.parentID = parentID
         }
-        if attributes.hasSupportsLimitedXattrs {
-            self.supportsLimitedXAttrs = attributes.supportsLimitedXattrs
+        if attrs.hasSupportsLimitedXattrs {
+            supportsLimitedXAttrs = attrs.supportsLimitedXattrs
         }
-        if attributes.hasInhibitKernelOffloadedIo {
-            self.inhibitKernelOffloadedIO = attributes.inhibitKernelOffloadedIo
+        if attrs.hasInhibitKernelOffloadedIo {
+            inhibitKernelOffloadedIO = attrs.inhibitKernelOffloadedIo
         }
-        if attributes.hasModifyTime {
-            self.modifyTime = timespec(attributes.modifyTime)
+        if attrs.hasModifyTime {
+            modifyTime = timespec(attrs.modifyTime)
         }
-        if attributes.hasAddedTime {
-            self.addedTime = timespec(attributes.addedTime)
+        if attrs.hasAddedTime {
+            addedTime = timespec(attrs.addedTime)
         }
-        if attributes.hasChangeTime {
-            self.changeTime = timespec(attributes.changeTime)
+        if attrs.hasChangeTime {
+            changeTime = timespec(attrs.changeTime)
         }
-        if attributes.hasAccessTime {
-            self.accessTime = timespec(attributes.accessTime)
+        if attrs.hasAccessTime {
+            accessTime = timespec(attrs.accessTime)
         }
-        if attributes.hasBirthTime {
-            self.birthTime = timespec(attributes.birthTime)
+        if attrs.hasBirthTime {
+            birthTime = timespec(attrs.birthTime)
         }
-        if attributes.hasBackupTime {
-            self.backupTime = timespec(attributes.backupTime)
+        if attrs.hasBackupTime {
+            backupTime = timespec(attrs.backupTime)
         }
     }
 
     func toProto() -> Pb_ItemAttributes {
-        var attributes = Pb_ItemAttributes()
-        if self.isValid(.uid) {
-            attributes.uid = self.uid
+        var attrs = Pb_ItemAttributes()
+        if isValid(.uid) {
+            attrs.uid = uid
         }
-        if self.isValid(.gid) {
-            attributes.gid = self.gid
+        if isValid(.gid) {
+            attrs.gid = gid
         }
-        if self.isValid(.mode) {
-            attributes.mode = self.mode
+        if isValid(.mode) {
+            attrs.mode = mode
         }
-        if self.isValid(.type) {
-            attributes.type = self.type.toProto()
+        if isValid(.type) {
+            attrs.type = type.toProto()
         }
-        if self.isValid(.linkCount) {
-            attributes.linkCount = self.linkCount
+        if isValid(.linkCount) {
+            attrs.linkCount = linkCount
         }
-        if self.isValid(.flags) {
-            attributes.flags = self.flags
+        if isValid(.flags) {
+            attrs.flags = flags
         }
-        if self.isValid(.size) {
-            attributes.size = self.size
+        if isValid(.size) {
+            attrs.size = size
         }
-        if self.isValid(.allocSize) {
-            attributes.allocSize = self.allocSize
+        if isValid(.allocSize) {
+            attrs.allocSize = allocSize
         }
-        if self.isValid(.fileID) {
-            attributes.fileID = self.fileID.rawValue
+        if isValid(.fileID) {
+            attrs.fileID = fileID.rawValue
         }
-        if self.isValid(.parentID) {
-            attributes.parentID = self.parentID.rawValue
+        if isValid(.parentID) {
+            attrs.parentID = parentID.rawValue
         }
-        if self.isValid(.supportsLimitedXAttrs) {
-            attributes.supportsLimitedXattrs = self.supportsLimitedXAttrs
+        if isValid(.supportsLimitedXAttrs) {
+            attrs.supportsLimitedXattrs = supportsLimitedXAttrs
         }
-        if self.isValid(.inhibitKernelOffloadedIO) {
-            attributes.inhibitKernelOffloadedIo = self.inhibitKernelOffloadedIO
+        if isValid(.inhibitKernelOffloadedIO) {
+            attrs.inhibitKernelOffloadedIo = inhibitKernelOffloadedIO
         }
-        if self.isValid(.modifyTime) {
-            attributes.modifyTime = self.modifyTime.toProto()
+        if isValid(.modifyTime) {
+            attrs.modifyTime = modifyTime.toProto()
         }
-        if self.isValid(.addedTime) {
-            attributes.addedTime = self.addedTime.toProto()
+        if isValid(.addedTime) {
+            attrs.addedTime = addedTime.toProto()
         }
-        if self.isValid(.changeTime) {
-            attributes.changeTime = self.changeTime.toProto()
+        if isValid(.changeTime) {
+            attrs.changeTime = changeTime.toProto()
         }
-        if self.isValid(.accessTime) {
-            attributes.accessTime = self.accessTime.toProto()
+        if isValid(.accessTime) {
+            attrs.accessTime = accessTime.toProto()
         }
-        if self.isValid(.birthTime) {
-            attributes.birthTime = self.birthTime.toProto()
+        if isValid(.birthTime) {
+            attrs.birthTime = birthTime.toProto()
         }
-        if self.isValid(.backupTime) {
-            attributes.backupTime = self.backupTime.toProto()
+        if isValid(.backupTime) {
+            attrs.backupTime = backupTime.toProto()
         }
-        return attributes
+        return attrs
     }
 }
 
 extension FSItem.ItemType {
     func toProto() -> Pb_ItemType {
-        return Pb_ItemType(rawValue: self.rawValue)!
+        return Pb_ItemType(rawValue: rawValue) ?? .UNRECOGNIZED(rawValue)
     }
 }
 
@@ -169,7 +245,7 @@ extension timespec {
     }
 
     private func normalize() -> timespec {
-        if self.tv_sec == HFSUnixEpochOffset {
+        if tv_sec == HFSUnixEpochOffset {
             var now = timespec()
             clock_gettime(CLOCK_REALTIME, &now)
             return now

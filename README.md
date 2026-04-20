@@ -88,7 +88,7 @@ Swift or skip FSKit. **FSKitBridge** removes that barrier.
   Implements FSKit operations and proxies them to the backend over a local socket.
 
 > Both live in **this single repo** and are built together. The appex is inside the host app at
-`FSKitBridge.app/Contents/PlugIns/FSKitExt.appex`.
+`FSKitBridge.app/Contents/Extensions/FSKitExt.appex`.
 
 ## How to use
 
@@ -122,23 +122,25 @@ Use the app as a template.
 # Path to the built FSKitBridge.app you want to install.
 APP="/path/to/FSKitBridge.app"
 
-# Remove any previously installed copy of FSKitBridge from /Applications.
+# Replace any existing installed copy.
 rm -rf /Applications/FSKitBridge.app
 
-# Copy the new build into the system Applications directory.
-cp -r "$APP" /Applications
+# Copy the app bundle into the system Applications directory.
+ditto "$APP" /Applications/FSKitBridge.app
 
-# Remove the quarantine attribute so macOS treats the app as trusted (avoids “unverified developer” warnings).
-xattr -dr com.apple.quarantine /Applications/FSKitBridge.app
+# Clear quarantine only if the attribute is present.
+if xattr -p com.apple.quarantine /Applications/FSKitBridge.app >/dev/null 2>&1; then
+  xattr -dr com.apple.quarantine /Applications/FSKitBridge.app
+fi
 
-# Launch the host app once to register its FSKit extension with PlugInKit.
-open -a /Applications/FSKitBridge.app
+# Register the host app and embedded FSKit extension.
+lsregister -f -R /Applications/FSKitBridge.app
+pluginkit -a /Applications/FSKitBridge.app/Contents/Extensions/FSKitExt.appex
+pluginkit -e use -p com.apple.fskit.fsmodule -i network.debox.fskitbridge.fskitext
 
-# List all registered FSKit modules (including your custom one) for verification.
-pluginkit -m -vv -p com.apple.fskit.fsmodule
+# List all registered FSKit modules for verification.
+pluginkit -m -Dvv -p com.apple.fskit.fsmodule
 ```
-
-If an earlier installation was present, a **reboot** is required to finalize the installation.
 
 ### 4. Enable extension
 
@@ -181,6 +183,22 @@ hdiutil detach "$DEVICE"
 
 # Delete the raw disk image.
 rm -f /tmp/fskitbridge.dmg
+```
+
+### 8. Uninstall
+
+```bash
+# Best-effort unregister the embedded extension and host app.
+pluginkit -r /Applications/FSKitBridge.app/Contents/Extensions/FSKitExt.appex || true
+lsregister -u /Applications/FSKitBridge.app || true
+
+# Remove the installed app bundle.
+rm -rf /Applications/FSKitBridge.app
+
+# Optional cleanup for local experiments.
+rm -rf "$HOME/Library/Containers/network.debox.fskitbridge" \
+       "$HOME/Library/Containers/network.debox.fskitbridge.fskitext" \
+       "$HOME/Library/Application Scripts/network.debox.fskitbridge.fskitext"
 ```
 
 ## Tests
